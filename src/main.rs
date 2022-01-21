@@ -204,7 +204,6 @@ async fn main() -> octocrab::Result<()> {
     let markdown_definitions = extract_definitions(&items);
 
     let mut file = File::create(format!("{}.md", args.date)).unwrap();
-    file.write("<pre>".as_bytes());
     file.write_all(FILE_TEMPLATE.as_bytes());
 
     let formatted_items = items
@@ -216,7 +215,6 @@ async fn main() -> octocrab::Result<()> {
     file.write_all(formatted_items.as_bytes());
     file.write(BREAK_LINE.as_bytes());
     file.write_all(markdown_definitions.join("\n").as_bytes());
-    file.write("</pre>".as_bytes());
 
     println!("{:?}", formatted_items);
 
