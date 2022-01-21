@@ -1,10 +1,10 @@
-## Chwalipięta
+## This-Week-in-Open-Source
 It's a tool written on top of [XAMPPRocky/octocrab](https://github.com/XAMPPRocky/octocrab/tree/master/src).
 It uses github's search API to find users' open source contributions.
 
 ### Usage
 
-chwalipieta is designe to run as a CLI tool either from an executable or directly with `cargo run`.
+this-week-in-open-source is designe to run as a CLI tool either from an executable or directly with `cargo run`.
 
 e.g `cargo run -after --date="2021-12-01" --users=BobrImperator`
 
