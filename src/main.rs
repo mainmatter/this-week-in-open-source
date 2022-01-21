@@ -1,4 +1,5 @@
 use octocrab::{markdown, models, Octocrab};
+use std::collections::HashSet;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
@@ -24,6 +25,10 @@ enjoy collaborating on various projects. In this blog post, we have collected
 some of the work they have done the past week!
 
 <!--break-->
+
+"#;
+
+const BREAK_LINE: &str = r#"
 
 "#;
 
@@ -117,32 +122,16 @@ struct Item {
     repository_name: String,
     repository_url: String,
     user_login: String,
+    user_url: String,
 }
 
-#[derive(Debug)]
-struct UserItem {
-    login: String,
-    items: Vec<Item>,
-}
-
-#[tokio::main]
-async fn main() -> octocrab::Result<()> {
-    let octocrab = octocrab::instance();
-    println!("{:?}", read_args());
-    println!("{:?}", process_args(read_args()));
-    let args = process_args(read_args());
-    // Returns the first page of all issues.
-    // Go through every page of issues. Warning: There's no rate limiting so
-    // be careful.
-    //
-    let mut user_items: Vec<UserItem> = vec![];
+async fn get_user_items(octocrab: &Arc<Octocrab>, args: &Args) -> Vec<Item> {
+    let mut items: Vec<Item> = vec![];
 
     for user in &args.users {
-        let mut page = get_prs(&octocrab, user, &args.date_sign, &args.date).await?;
-        let mut user_item = UserItem {
-            login: user.to_string(),
-            items: vec![],
-        };
+        let mut page = get_prs(&octocrab, user, &args.date_sign, &args.date)
+            .await
+            .unwrap();
 
         loop {
             for issue in &page {
@@ -158,87 +147,78 @@ async fn main() -> octocrab::Result<()> {
                 repository_url_parts.pop(); // id
                 repository_url_parts.pop(); // /pulls
 
-                user_item.items.push(Item {
+                items.push(Item {
                     user_login: issue.user.login.clone(),
+                    user_url: issue.user.html_url.to_string(),
                     issue_number: issue.number.to_string(),
                     issue_title: issue.title.clone(),
                     repository_name: format!("{}/{}", path_parts[0], path_parts[1]),
                     repository_url: repository_url_parts.join("/"),
                 });
             }
-            page = match octocrab.get_page(&page.next).await? {
+            page = match octocrab.get_page(&page.next).await.unwrap() {
                 Some(next_page) => next_page,
                 None => {
-                    user_items.push(user_item);
                     break;
                 }
             }
         }
     }
 
-    let mut file = File::create(format!("{}.html", args.date)).unwrap();
-    file.write_all(FILE_TEMPLATE.as_bytes());
-    let content = String::from("");
+    items
+}
 
-    for user_item in &user_items {
-        let items = &user_item.items;
-        let formatted_items = items
-            .into_iter()
-            .map(|item| format_item(user_item.login.clone(), &item))
-            .collect::<Vec<String>>()
-            .join("\n");
+fn extract_definitions(items: &Vec<Item>) -> Vec<String> {
+    let mut unique_users = HashSet::new();
+    let mut unique_repositories = HashSet::new();
 
-        let markdown = octocrab.markdown().render(&formatted_items).send().await?;
-        file.write_all(markdown.as_bytes());
-        file.write("<pre>".as_bytes());
-        file.write_all(formatted_items.as_bytes());
-        file.write("</pre>".as_bytes());
+    for item in items {
+        unique_users.insert(format!("[@{}]: {}", item.user_login, item.user_url));
+        unique_repositories.insert(format!(
+            "[{}]: {}",
+            item.repository_name, item.repository_url
+        ));
     }
-    println!("{:?}", user_items);
 
-    // let octocrab = Octocrab::default();
-    // let mut page = octocrab
-    //     .pulls("simplabs", "qunit-dom")
-    //     .list()
-    //     .per_page(5)
-    //     .send()
-    //     .await?;
+    let mut unique_users = Vec::from_iter(unique_users);
+    unique_users.sort();
 
-    // let number_of_pages = page.number_of_pages();
+    let mut unique_repositories = Vec::from_iter(unique_repositories);
+    unique_repositories.sort();
 
-    // for page in number_of_pages.drain() {
+    let mut definitions = vec![];
 
-    // }
+    definitions.append(&mut unique_users);
+    definitions.append(&mut unique_repositories);
 
-    // match number_of_pages {
-    //     Some(a) => println!(":)(, {}", a),
-    //     None => println!("Nothing"),
-    // }
+    definitions
+}
 
-    // let mut prs = page.take_items();
-    // println!("REEE");
-    // for pr in prs.drain(..) {
-    //     println!("{}, yay", pr.url);
-    // }
+#[tokio::main]
+async fn main() -> octocrab::Result<()> {
+    let octocrab = octocrab::instance();
+    let args = process_args(read_args());
+    let mut items = get_user_items(&octocrab, &args).await;
 
-    // let mut current_page = octocrab
-    //     .orgs("rust-lang")
-    //     .list_repos()
-    //     .repo_type(params::repos::Type::Sources)
-    //     .per_page(100)
-    //     .send()
-    //     .await?;
-    // let mut prs = current_page.take_items();
+    items.sort_by_key(|item| item.repository_name.clone());
+    let markdown_definitions = extract_definitions(&items);
 
-    // while let Ok(Some(mut new_page)) = octocrab.get_page(&current_page.next).await {
-    //     prs.extend(new_page.take_items());
+    let mut file = File::create(format!("{}.md", args.date)).unwrap();
+    file.write("<pre>".as_bytes());
+    file.write_all(FILE_TEMPLATE.as_bytes());
 
-    //     for pr in prs.drain(..) {
-    //         println!("{:?}", pr);
-    //     }
+    let formatted_items = items
+        .into_iter()
+        .map(|item| format_item(item.user_login.clone(), &item))
+        .collect::<Vec<String>>()
+        .join("\n");
+    // let markdown = octocrab.markdown().render(&formatted_items).send().await?;
+    file.write_all(formatted_items.as_bytes());
+    file.write(BREAK_LINE.as_bytes());
+    file.write_all(markdown_definitions.join("\n").as_bytes());
+    file.write("</pre>".as_bytes());
 
-    //     current_page = new_page;
-    // }
+    println!("{:?}", formatted_items);
 
     Ok(())
 }
