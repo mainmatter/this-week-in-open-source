@@ -1,9 +1,8 @@
-use octocrab::{markdown, models, Octocrab};
+use octocrab::{models, Octocrab};
 use std::collections::HashSet;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use std::sync::Arc;
 
 const FILE_TEMPLATE: &str = r#"
 ---
@@ -90,7 +89,7 @@ fn process_args(pairs: Vec<Arg>) -> Args {
 }
 
 async fn get_prs(
-    octocrab: &Arc<Octocrab>,
+    octocrab: &Octocrab,
     user: &String,
     date_sign: &String,
     date: &String,
@@ -103,7 +102,6 @@ async fn get_prs(
             date_sign.as_str(),
             date.as_str(),
         ))
-        // Optional Parameters
         .send()
         .await
 }
@@ -125,7 +123,7 @@ struct Item {
     user_url: String,
 }
 
-async fn get_user_items(octocrab: &Arc<Octocrab>, args: &Args) -> Vec<Item> {
+async fn get_user_items(octocrab: &Octocrab, args: &Args) -> Vec<Item> {
     let mut items: Vec<Item> = vec![];
 
     for user in &args.users {
@@ -194,9 +192,18 @@ fn extract_definitions(items: &Vec<Item>) -> Vec<String> {
     definitions
 }
 
+async fn initialize_octocrab() -> octocrab::Result<Octocrab> {
+    let (_, token) = env::vars()
+        .find(|(key, _)| key == "GITHUB_PERSONAL_TOKEN")
+        .unwrap_or((String::from("DEFAULT"), String::from("")));
+
+    Octocrab::builder().personal_token(token).build()
+}
+
 #[tokio::main]
 async fn main() -> octocrab::Result<()> {
-    let octocrab = octocrab::instance();
+    let octocrab = initialize_octocrab().await?;
+
     let args = process_args(read_args());
     let mut items = get_user_items(&octocrab, &args).await;
 
@@ -204,14 +211,13 @@ async fn main() -> octocrab::Result<()> {
     let markdown_definitions = extract_definitions(&items);
 
     let mut file = File::create(format!("{}.md", args.date)).unwrap();
-    file.write_all(FILE_TEMPLATE.as_bytes());
-
     let formatted_items = items
         .into_iter()
         .map(|item| format_item(item.user_login.clone(), &item))
         .collect::<Vec<String>>()
         .join("\n");
-    // let markdown = octocrab.markdown().render(&formatted_items).send().await?;
+
+    file.write_all(FILE_TEMPLATE.as_bytes());
     file.write_all(formatted_items.as_bytes());
     file.write(BREAK_LINE.as_bytes());
     file.write_all(markdown_definitions.join("\n").as_bytes());
