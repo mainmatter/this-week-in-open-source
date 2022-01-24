@@ -197,7 +197,11 @@ async fn initialize_octocrab() -> octocrab::Result<Octocrab> {
         .find(|(key, _)| key == "GITHUB_PERSONAL_TOKEN")
         .unwrap_or((String::from("DEFAULT"), String::from("")));
 
-    Octocrab::builder().personal_token(token).build()
+    if token.len() > 0 {
+        Octocrab::builder().personal_token(token).build()
+    } else {
+        Octocrab::builder().build()
+    }
 }
 
 #[tokio::main]
