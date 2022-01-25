@@ -39,21 +39,26 @@ e.g `-before --date=2021-12-01` = `< 2021-12-01`.
 
 It's possible to configure file header and repository labels via `json` file.
 
-- `repos` A list of objects with `name` and `label` properties.
-It will attempt to group contributions to a given repository by `name` and apply the provided `label`.
+- `labels` A list of objects with `name` and `repos` properties.
+It will attempt to group items under their commont label.
+
 e.g 
 ```json
 // sample_config.json
 
 {
-  "repos": [
+  "labels": [
     {
-      "name": "rust-lang/crates.io",
-      "label": "Rust"
+      "name": "Rust",
+      "repos": [
+        "rust-lang/crates.io"
+      ]
     },
     {
-      "name": "ember-cli/ember-exam",
-      "label": "Ember"
+      "name": "Ember",
+      "repos": [
+        "ember-cli/ember-exam"
+      ]
     }
   ]
 }

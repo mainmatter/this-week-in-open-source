@@ -1,12 +1,17 @@
 {
-  "repos": [
+  "labels": [
     {
-      "name": "rust-lang/crates.io",
-      "label": "Rust"
+      "name": "Rust",
+      "repos": [
+        "rust-lang/crates.io",
+        "Turbo87/aprs-parser-rs"
+      ]
     },
     {
-      "name": "ember-cli/ember-exam",
-      "label": "Ember"
+      "name": "Ember",
+      "repos": [
+        "ember-cli/ember-exam"
+      ]
     }
   ]
 }

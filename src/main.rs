@@ -17,14 +17,14 @@ const BREAK_LINE: &str = r#"
 #[derive(Deserialize, Clone)]
 struct RepoConfig {
     name: String,
-    label: String,
+    repos: Vec<String>,
     #[serde(default)]
     items: Vec<Item>,
 }
 
 #[derive(Deserialize)]
 struct FileConfig {
-    repos: Vec<RepoConfig>,
+    labels: Vec<RepoConfig>,
     #[serde(default)]
     header: Vec<String>,
 }
@@ -129,7 +129,7 @@ fn format_item(user_login: String, item: &Item) -> String {
 }
 
 fn format_label(repo: &RepoConfig) -> String {
-    format!("## {}", repo.label)
+    format!("## {}", repo.name)
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -232,7 +232,7 @@ fn match_items_with_labels<'a>(
     for item in items {
         let label = repos
             .into_iter()
-            .find(|label| label.name == item.repository_name);
+            .find(|label| label.repos.contains(&item.repository_name));
 
         match label {
             Some(label) => {
@@ -259,7 +259,7 @@ async fn main() -> octocrab::Result<()> {
     let args = process_args(read_args());
     match read_config_from_file(args.config_path.clone()) {
         Ok(config) => {
-            let mut repos = config.repos.clone();
+            let mut repos = config.labels.clone();
             repos.sort_by_key(|label| label.name.clone());
 
             let mut items = get_user_items(&octocrab, &args).await;
