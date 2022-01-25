@@ -1,8 +1,14 @@
 use octocrab::{models, Octocrab};
+use serde;
+use serde::Deserialize;
+use serde_json;
 use std::collections::HashSet;
 use std::env;
+use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::BufReader;
+use std::path::Path;
 
 const FILE_TEMPLATE: &str = r#"
 ---
@@ -31,11 +37,28 @@ const BREAK_LINE: &str = r#"
 
 "#;
 
-#[derive(Clone)]
+#[derive(Deserialize, Clone)]
 struct RepoLabel {
     repository_name: String,
     label: String,
+    #[serde(default)]
     items: Vec<Item>,
+}
+
+#[derive(Deserialize)]
+struct FileConfig {
+    repos: Vec<RepoLabel>,
+    #[serde(default)]
+    header: String,
+}
+
+fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn Error>> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+
+    let config = serde_json::from_reader(reader)?;
+
+    Ok(config)
 }
 
 #[derive(Debug)]
@@ -64,6 +87,7 @@ struct Args {
     users: Vec<String>,
     date: String,
     date_sign: String,
+    config_path: String,
 }
 
 fn process_args(pairs: Vec<Arg>) -> Args {
@@ -71,6 +95,7 @@ fn process_args(pairs: Vec<Arg>) -> Args {
         users: vec![],
         date: String::from(""),
         date_sign: String::from(""),
+        config_path: String::from(""),
     };
 
     for pair in pairs {
@@ -88,8 +113,14 @@ fn process_args(pairs: Vec<Arg>) -> Args {
             }
             ("-before", _) => args.date_sign = String::from("<"),
             ("-after", _) => args.date_sign = String::from(">"),
+            ("--config-path", value) => args.config_path = value.to_string(),
             (name, value) => println!("Could not handle argument {} with value {}", name, value),
         }
+    }
+
+    if args.config_path.len() == 0 {
+        println!("--config-path is not provided.");
+        println!("This will result with unlabelled items.");
     }
 
     args
@@ -124,7 +155,7 @@ fn format_label(repo_label: &RepoLabel) -> String {
     format!("## {}", repo_label.label)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 struct Item {
     issue_number: String,
     issue_title: String,
@@ -247,45 +278,68 @@ fn format_items(items: &Vec<Item>) -> Vec<String> {
 #[tokio::main]
 async fn main() -> octocrab::Result<()> {
     let octocrab = initialize_octocrab().await?;
-    let mut repo_labels = vec![RepoLabel {
-        repository_name: String::from("ember-cli/ember-exam"),
-        label: String::from("Ember"),
-        items: vec![],
-    }];
-    repo_labels.sort_by_key(|label| label.repository_name.clone());
 
     let args = process_args(read_args());
-    let mut items = get_user_items(&octocrab, &args).await;
+    match read_config_from_file(args.config_path.clone()) {
+        Ok(config) => {
+            let mut repo_labels = config.repos.clone();
+            repo_labels.sort_by_key(|label| label.repository_name.clone());
 
-    items.sort_by_key(|item| item.repository_name.clone());
-    let markdown_definitions = extract_definitions(&items);
+            let mut items = get_user_items(&octocrab, &args).await;
 
-    let mut file = File::create(format!("{}.md", args.date)).unwrap();
+            items.sort_by_key(|item| item.repository_name.clone());
+            let markdown_definitions = extract_definitions(&items);
 
-    let (labels, unknown_items) = match_items_with_labels(&mut repo_labels, &items);
+            let mut file = File::create(format!("{}.md", args.date)).unwrap();
 
-    let mut content: Vec<String> = vec![];
+            let (labels, unknown_items) = match_items_with_labels(&mut repo_labels, &items);
 
-    for (i, label) in labels.iter().enumerate() {
-        if i > 0 {
-            content.push(String::from(""));
+            let mut content: Vec<String> = vec![];
+
+            for (i, label) in labels.iter().enumerate() {
+                if i > 0 {
+                    content.push(String::from(""));
+                }
+                content.push(format_label(&label));
+                content.push(String::from(""));
+                content.append(&mut format_items(&label.items));
+            }
+
+            if unknown_items.len() > 0 {
+                content.push(String::from(""));
+                content.push(String::from("## Unknown"));
+                content.push(String::from(""));
+                content.append(&mut format_items(&unknown_items));
+            }
+
+            file.write_all(FILE_TEMPLATE.as_bytes());
+            file.write_all(content.join("\n").as_bytes());
+            file.write(BREAK_LINE.as_bytes());
+            file.write_all(markdown_definitions.join("\n").as_bytes());
         }
-        content.push(format_label(&label));
-        content.push(String::from(""));
-        content.append(&mut format_items(&label.items));
-    }
+        Err(e) => {
+            println!(
+                "Couldn't open configuration file '--config-path={}'",
+                args.config_path.clone()
+            );
+            println!("{}", e);
+            let mut items = get_user_items(&octocrab, &args).await;
 
-    if unknown_items.len() > 0 {
-        content.push(String::from(""));
-        content.push(String::from("## Unknown"));
-        content.push(String::from(""));
-        content.append(&mut format_items(&unknown_items));
-    }
+            items.sort_by_key(|item| item.repository_name.clone());
+            let markdown_definitions = extract_definitions(&items);
 
-    file.write_all(FILE_TEMPLATE.as_bytes());
-    file.write_all(content.join("\n").as_bytes());
-    file.write(BREAK_LINE.as_bytes());
-    file.write_all(markdown_definitions.join("\n").as_bytes());
+            let mut file = File::create(format!("{}.md", args.date)).unwrap();
+
+            let mut content: Vec<String> = vec![];
+
+            content.append(&mut format_items(&items));
+
+            file.write_all(FILE_TEMPLATE.as_bytes());
+            file.write_all(content.join("\n").as_bytes());
+            file.write(BREAK_LINE.as_bytes());
+            file.write_all(markdown_definitions.join("\n").as_bytes());
+        }
+    }
 
     Ok(())
 }
