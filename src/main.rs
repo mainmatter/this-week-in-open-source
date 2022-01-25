@@ -31,6 +31,13 @@ const BREAK_LINE: &str = r#"
 
 "#;
 
+#[derive(Clone)]
+struct RepoLabel {
+    repository_name: String,
+    label: String,
+    items: Vec<Item>,
+}
+
 #[derive(Debug)]
 struct Arg(String, String);
 
@@ -113,7 +120,11 @@ fn format_item(user_login: String, item: &Item) -> String {
     )
 }
 
-#[derive(Debug)]
+fn format_label(repo_label: &RepoLabel) -> String {
+    format!("## {}", repo_label.label)
+}
+
+#[derive(Debug, Clone)]
 struct Item {
     issue_number: String,
     issue_title: String,
@@ -204,9 +215,44 @@ async fn initialize_octocrab() -> octocrab::Result<Octocrab> {
     }
 }
 
+fn match_items_with_labels<'a>(
+    repo_labels: &'a mut Vec<RepoLabel>,
+    items: &Vec<Item>,
+) -> (&'a Vec<RepoLabel>, Vec<Item>) {
+    let mut unknown_items: Vec<Item> = vec![];
+
+    for item in items {
+        let label = repo_labels
+            .into_iter()
+            .find(|label| label.repository_name == item.repository_name);
+
+        match label {
+            Some(label) => {
+                label.items.push(item.clone());
+            }
+            None => unknown_items.push(item.clone()),
+        }
+    }
+
+    (repo_labels, unknown_items)
+}
+
+fn format_items(items: &Vec<Item>) -> Vec<String> {
+    items
+        .into_iter()
+        .map(|item| format_item(item.user_login.clone(), &item))
+        .collect::<Vec<String>>()
+}
+
 #[tokio::main]
 async fn main() -> octocrab::Result<()> {
     let octocrab = initialize_octocrab().await?;
+    let mut repo_labels = vec![RepoLabel {
+        repository_name: String::from("ember-cli/ember-exam"),
+        label: String::from("Ember"),
+        items: vec![],
+    }];
+    repo_labels.sort_by_key(|label| label.repository_name.clone());
 
     let args = process_args(read_args());
     let mut items = get_user_items(&octocrab, &args).await;
@@ -215,18 +261,31 @@ async fn main() -> octocrab::Result<()> {
     let markdown_definitions = extract_definitions(&items);
 
     let mut file = File::create(format!("{}.md", args.date)).unwrap();
-    let formatted_items = items
-        .into_iter()
-        .map(|item| format_item(item.user_login.clone(), &item))
-        .collect::<Vec<String>>()
-        .join("\n");
+
+    let (labels, unknown_items) = match_items_with_labels(&mut repo_labels, &items);
+
+    let mut content: Vec<String> = vec![];
+
+    for (i, label) in labels.iter().enumerate() {
+        if i > 0 {
+            content.push(String::from(""));
+        }
+        content.push(format_label(&label));
+        content.push(String::from(""));
+        content.append(&mut format_items(&label.items));
+    }
+
+    if unknown_items.len() > 0 {
+        content.push(String::from(""));
+        content.push(String::from("## Unknown"));
+        content.push(String::from(""));
+        content.append(&mut format_items(&unknown_items));
+    }
 
     file.write_all(FILE_TEMPLATE.as_bytes());
-    file.write_all(formatted_items.as_bytes());
+    file.write_all(content.join("\n").as_bytes());
     file.write(BREAK_LINE.as_bytes());
     file.write_all(markdown_definitions.join("\n").as_bytes());
-
-    println!("{:?}", formatted_items);
 
     Ok(())
 }
