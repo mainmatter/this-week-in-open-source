@@ -27,6 +27,8 @@ struct FileConfig {
     labels: Vec<RepoConfig>,
     #[serde(default)]
     header: Vec<String>,
+    #[serde(default)]
+    users: Vec<String>,
 }
 
 fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn Error>> {
@@ -142,11 +144,11 @@ struct Item {
     user_url: String,
 }
 
-async fn get_user_items(octocrab: &Octocrab, args: &Args) -> Vec<Item> {
+async fn get_user_items(octocrab: &Octocrab, users: Vec<String>, args: &Args) -> Vec<Item> {
     let mut items: Vec<Item> = vec![];
 
-    for user in &args.users {
-        let mut page = get_prs(&octocrab, user, &args.date_sign, &args.date)
+    for user in users {
+        let mut page = get_prs(&octocrab, &user, &args.date_sign, &args.date)
             .await
             .unwrap();
 
@@ -262,7 +264,12 @@ async fn main() -> octocrab::Result<()> {
             let mut repos = config.labels.clone();
             repos.sort_by_key(|label| label.name.clone());
 
-            let mut items = get_user_items(&octocrab, &args).await;
+            let users = if config.users.len() > 0 {
+                config.users.clone()
+            } else {
+                args.users.clone()
+            };
+            let mut items = get_user_items(&octocrab, users, &args).await;
 
             items.sort_by_key(|item| item.repository_name.clone());
             let markdown_definitions = extract_definitions(&items);
@@ -300,7 +307,7 @@ async fn main() -> octocrab::Result<()> {
                 args.config_path.clone()
             );
             println!("{}", e);
-            let mut items = get_user_items(&octocrab, &args).await;
+            let mut items = get_user_items(&octocrab, args.users.clone(), &args).await;
 
             items.sort_by_key(|item| item.repository_name.clone());
             let markdown_definitions = extract_definitions(&items);

@@ -83,5 +83,16 @@ Header
 
 ```
 
+- `users` A list of strings which are a valid github handles:
+This will replace the `--users` cli option when both are present.
+
+```json
+// sample_config.json
+{
+  "users": ["BobrImperator"]
+}
+
+```
+
 [sample_output.md](2021-12-01.md)
 [sample_config.json](sample_config.json)
