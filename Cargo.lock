@@ -1058,6 +1058,8 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "octocrab",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
