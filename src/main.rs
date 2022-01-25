@@ -10,36 +10,13 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 
-const FILE_TEMPLATE: &str = r#"
----
-title: 'This week in Open Source at simplabs #2'
-author: 'simplabs'
-github: simplabs
-twitter: simplabs
-topic: open-source
-bio: 'The simplabs team'
-description:
-  'A collection of work that our engineers have been carrying out in open-source
-  in the past few weeks.'
-og:
-  image: /assets/images/posts/2022-01-11-this-week-in-os-2/og-image.png
----
-
-Our software engineers are all active members of the open-source community and
-enjoy collaborating on various projects. In this blog post, we have collected
-some of the work they have done the past week!
-
-<!--break-->
-
-"#;
-
 const BREAK_LINE: &str = r#"
 
 "#;
 
 #[derive(Deserialize, Clone)]
-struct RepoLabel {
-    repository_name: String,
+struct RepoConfig {
+    name: String,
     label: String,
     #[serde(default)]
     items: Vec<Item>,
@@ -47,9 +24,9 @@ struct RepoLabel {
 
 #[derive(Deserialize)]
 struct FileConfig {
-    repos: Vec<RepoLabel>,
+    repos: Vec<RepoConfig>,
     #[serde(default)]
-    header: String,
+    header: Vec<String>,
 }
 
 fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn Error>> {
@@ -151,8 +128,8 @@ fn format_item(user_login: String, item: &Item) -> String {
     )
 }
 
-fn format_label(repo_label: &RepoLabel) -> String {
-    format!("## {}", repo_label.label)
+fn format_label(repo: &RepoConfig) -> String {
+    format!("## {}", repo.label)
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -247,15 +224,15 @@ async fn initialize_octocrab() -> octocrab::Result<Octocrab> {
 }
 
 fn match_items_with_labels<'a>(
-    repo_labels: &'a mut Vec<RepoLabel>,
+    repos: &'a mut Vec<RepoConfig>,
     items: &Vec<Item>,
-) -> (&'a Vec<RepoLabel>, Vec<Item>) {
+) -> (&'a Vec<RepoConfig>, Vec<Item>) {
     let mut unknown_items: Vec<Item> = vec![];
 
     for item in items {
-        let label = repo_labels
+        let label = repos
             .into_iter()
-            .find(|label| label.repository_name == item.repository_name);
+            .find(|label| label.name == item.repository_name);
 
         match label {
             Some(label) => {
@@ -265,7 +242,7 @@ fn match_items_with_labels<'a>(
         }
     }
 
-    (repo_labels, unknown_items)
+    (repos, unknown_items)
 }
 
 fn format_items(items: &Vec<Item>) -> Vec<String> {
@@ -282,8 +259,8 @@ async fn main() -> octocrab::Result<()> {
     let args = process_args(read_args());
     match read_config_from_file(args.config_path.clone()) {
         Ok(config) => {
-            let mut repo_labels = config.repos.clone();
-            repo_labels.sort_by_key(|label| label.repository_name.clone());
+            let mut repos = config.repos.clone();
+            repos.sort_by_key(|label| label.name.clone());
 
             let mut items = get_user_items(&octocrab, &args).await;
 
@@ -292,7 +269,7 @@ async fn main() -> octocrab::Result<()> {
 
             let mut file = File::create(format!("{}.md", args.date)).unwrap();
 
-            let (labels, unknown_items) = match_items_with_labels(&mut repo_labels, &items);
+            let (labels, unknown_items) = match_items_with_labels(&mut repos, &items);
 
             let mut content: Vec<String> = vec![];
 
@@ -312,7 +289,7 @@ async fn main() -> octocrab::Result<()> {
                 content.append(&mut format_items(&unknown_items));
             }
 
-            file.write_all(FILE_TEMPLATE.as_bytes());
+            file.write_all(config.header.join("\n").as_bytes());
             file.write_all(content.join("\n").as_bytes());
             file.write(BREAK_LINE.as_bytes());
             file.write_all(markdown_definitions.join("\n").as_bytes());
@@ -334,7 +311,6 @@ async fn main() -> octocrab::Result<()> {
 
             content.append(&mut format_items(&items));
 
-            file.write_all(FILE_TEMPLATE.as_bytes());
             file.write_all(content.join("\n").as_bytes());
             file.write(BREAK_LINE.as_bytes());
             file.write_all(markdown_definitions.join("\n").as_bytes());
