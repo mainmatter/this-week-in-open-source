@@ -282,7 +282,7 @@ async fn main() -> octocrab::Result<()> {
 
             let mut content: Vec<String> = vec![];
 
-            for (i, label) in labels.iter().enumerate() {
+            for (i, label) in labels.iter().filter(|i| i.items.len() > 0).enumerate() {
                 if i > 0 {
                     content.push(String::from(""));
                 }
