@@ -15,6 +15,10 @@
       "repos": [
         "ember-cli/ember-exam"
       ]
+    },
+    {
+      "name": "Ruby",
+      "repos": []
     }
   ]
 }
