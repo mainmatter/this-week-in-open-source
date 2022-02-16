@@ -126,7 +126,7 @@ async fn get_prs(
 fn format_item(user_login: String, item: &Item) -> String {
     format!(
         "- [{}] [#{}]({}) {} ([@{}])",
-        item.repository_name, item.issue_number, item.repository_url, item.issue_title, user_login
+        item.repository_name, item.issue_number, item.issue_url, item.issue_title, user_login
     )
 }
 
@@ -138,6 +138,7 @@ fn format_label(repo: &RepoConfig) -> String {
 struct Item {
     issue_number: String,
     issue_title: String,
+    issue_url: String,
     repository_name: String,
     repository_url: String,
     user_login: String,
@@ -171,6 +172,7 @@ async fn get_user_items(octocrab: &Octocrab, users: Vec<String>, args: &Args) ->
                     user_url: issue.user.html_url.to_string(),
                     issue_number: issue.number.to_string(),
                     issue_title: issue.title.clone(),
+                    issue_url: url.to_string(),
                     repository_name: format!("{}/{}", path_parts[0], path_parts[1]),
                     repository_url: repository_url_parts.join("/"),
                 });
@@ -325,4 +327,39 @@ async fn main() -> octocrab::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_formats_items() {
+        let items: Vec<Item> = vec![
+            Item {
+                issue_number: "63".to_string(),
+                issue_title: "Update nan".to_string(),
+                issue_url: "https://github.com/atom/keyboard-layout/pull/63".to_string(),
+                repository_name: "atom/keyboard-layout".to_string(),
+                repository_url: "https://github.com/atom/keyboard-layout".to_string(),
+                user_login: "mansona".to_string(),
+                user_url: "https://github.com/mansona".to_string(),
+            },
+            Item {
+                issue_number: "798".to_string(),
+                issue_title: "Ember 4 compatibility".to_string(),
+                issue_url: "https://github.com/ember-engines/ember-engines/pull/798".to_string(),
+                repository_name: "ember-engines/ember-engines".to_string(),
+                repository_url: "https://github.com/ember-engines/ember-engines".to_string(),
+                user_login: "BobrImperator".to_string(),
+                user_url: "https://github.com/BobrImperator".to_string(),
+            },
+        ];
+
+        let expected = vec![
+            "- [atom/keyboard-layout] [#63](https://github.com/atom/keyboard-layout/pull/63) Update nan ([@mansona])",
+            "- [ember-engines/ember-engines] [#798](https://github.com/ember-engines/ember-engines/pull/798) Ember 4 compatibility ([@BobrImperator])",
+        ];
+        assert_eq!(expected, format_items(&items));
+    }
 }
