@@ -94,5 +94,20 @@ This will replace the `--users` cli option when both are present.
 
 ```
 
+- `exclude` a list of repository names that should be excluded from the output.
+
+```json
+// sample_config.json
+{
+  "exclude": ["simplabs/simplabs.github.io"]
+}
+
+```
+
+### Deploy
+So far there isn't anything exciting for deploying it :)
+If you wish to create a binary then run: `cargo build --target x86_64-apple-darwin --release --target-dir=bin`
+then grab a binary of the specified target located in the target directory e.g `bin/x86_64-apple-darwin/release/this-week-in-open-source`
+
 [sample_output.md](2021-12-01.md)
 [sample_config.json](sample_config.json)
