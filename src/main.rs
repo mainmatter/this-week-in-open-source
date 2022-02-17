@@ -14,7 +14,8 @@ const BREAK_LINE: &str = r#"
 
 "#;
 
-#[derive(Deserialize, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Deserialize, Clone, Debug)]
 struct RepoConfig {
     name: String,
     repos: Vec<String>,
@@ -33,6 +34,30 @@ struct FileConfig {
     exclude: Vec<String>,
 }
 
+#[derive(Debug)]
+struct Arg(String, String);
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
+struct Args {
+    users: Vec<String>,
+    date: String,
+    date_sign: String,
+    config_path: String,
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Deserialize, Debug, Clone)]
+struct Item {
+    issue_number: String,
+    issue_title: String,
+    issue_url: String,
+    repository_name: String,
+    repository_url: String,
+    user_login: String,
+    user_url: String,
+}
+
 fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn Error>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -41,9 +66,6 @@ fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn 
 
     Ok(config)
 }
-
-#[derive(Debug)]
-struct Arg(String, String);
 
 fn read_args() -> Vec<Arg> {
     let mut args = vec![];
@@ -61,14 +83,6 @@ fn read_args() -> Vec<Arg> {
     }
 
     args
-}
-
-#[derive(Debug)]
-struct Args {
-    users: Vec<String>,
-    date: String,
-    date_sign: String,
-    config_path: String,
 }
 
 fn process_args(pairs: Vec<Arg>) -> Args {
@@ -134,17 +148,6 @@ fn format_item(user_login: String, item: &Item) -> String {
 
 fn format_label(repo: &RepoConfig) -> String {
     format!("## {}", repo.name)
-}
-
-#[derive(Deserialize, Debug, Clone)]
-struct Item {
-    issue_number: String,
-    issue_title: String,
-    issue_url: String,
-    repository_name: String,
-    repository_url: String,
-    user_login: String,
-    user_url: String,
 }
 
 async fn get_user_items(octocrab: &Octocrab, users: Vec<String>, args: &Args) -> Vec<Item> {
@@ -339,9 +342,8 @@ async fn main() -> octocrab::Result<()> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn it_formats_items() {
-        let items: Vec<Item> = vec![
+    fn items_helper() -> Vec<Item> {
+        vec![
             Item {
                 issue_number: "63".to_string(),
                 issue_title: "Update nan".to_string(),
@@ -360,12 +362,176 @@ mod tests {
                 user_login: "BobrImperator".to_string(),
                 user_url: "https://github.com/BobrImperator".to_string(),
             },
-        ];
+        ]
+    }
 
+    fn repo_configs_helper() -> Vec<RepoConfig> {
+        vec![RepoConfig {
+            name: "Ember".to_string(),
+            repos: vec!["ember-engines/ember-engines".to_string()],
+            items: vec![],
+        }]
+    }
+    #[test]
+    fn it_formats_label() {
+        assert_eq!("## Ember", format_label(&repo_configs_helper()[0]));
+    }
+    #[test]
+    fn it_formats_item() {
+        assert_eq!(
+            "- [atom/keyboard-layout] [#63](https://github.com/atom/keyboard-layout/pull/63) Update nan ([@mansona])",
+            format_item("mansona".to_string(), &items_helper()[0])
+        );
+    }
+
+    #[test]
+    fn it_formats_items() {
         let expected = vec![
             "- [atom/keyboard-layout] [#63](https://github.com/atom/keyboard-layout/pull/63) Update nan ([@mansona])",
             "- [ember-engines/ember-engines] [#798](https://github.com/ember-engines/ember-engines/pull/798) Ember 4 compatibility ([@BobrImperator])",
         ];
-        assert_eq!(expected, format_items(&items));
+        assert_eq!(expected, format_items(&items_helper()));
+    }
+
+    #[test]
+    fn it_extracts_definitions() {
+        let expected = vec![
+            "[@BobrImperator]: https://github.com/BobrImperator",
+            "[@mansona]: https://github.com/mansona",
+            "[atom/keyboard-layout]: https://github.com/atom/keyboard-layout",
+            "[ember-engines/ember-engines]: https://github.com/ember-engines/ember-engines",
+        ];
+        assert_eq!(expected, extract_definitions(&items_helper()));
+    }
+
+    #[test]
+    fn it_matches_items_with_labels() {
+        let items = items_helper();
+        let mut repo_configs = repo_configs_helper();
+        let atom_keyboard_item = items[0].clone();
+        let ember_engines_item = items[1].clone();
+
+        let labels_result = match_items_with_labels(&mut repo_configs, &items);
+        let expected = (
+            &vec![RepoConfig {
+                name: "Ember".to_string(),
+                repos: vec!["ember-engines/ember-engines".to_string()],
+                items: vec![ember_engines_item],
+            }],
+            vec![atom_keyboard_item],
+        );
+
+        assert_eq!(expected, labels_result);
+    }
+
+    #[test]
+    fn it_processes_args() {
+        let expected = Args {
+            users: vec![],
+            date: "".to_string(),
+            date_sign: "".to_string(),
+            config_path: "".to_string(),
+        };
+
+        assert_eq!(expected, process_args(vec![]));
+    }
+
+    #[test]
+    fn it_processes_users_args() {
+        let expected = Args {
+            users: vec!["BobrImperator".to_string()],
+            date: "".to_string(),
+            date_sign: "".to_string(),
+            config_path: "".to_string(),
+        };
+
+        assert_eq!(
+            expected,
+            process_args(vec![Arg(
+                "--users".to_string(),
+                "BobrImperator".to_string()
+            )])
+        );
+    }
+
+    #[test]
+    fn it_processes_multiple_users_args() {
+        let expected = Args {
+            users: vec!["BobrImperator".to_string(), "mansona".to_string()],
+            date: "".to_string(),
+            date_sign: "".to_string(),
+            config_path: "".to_string(),
+        };
+
+        assert_eq!(
+            expected,
+            process_args(vec![Arg(
+                "--users".to_string(),
+                "BobrImperator,mansona".to_string()
+            )])
+        );
+    }
+
+    #[test]
+    fn it_processes_date_args() {
+        let expected = Args {
+            users: vec![],
+            date: "2022-02-18".to_string(),
+            date_sign: "".to_string(),
+            config_path: "".to_string(),
+        };
+
+        assert_eq!(
+            expected,
+            process_args(vec![Arg("--date".to_string(), "2022-02-18".to_string())])
+        );
+    }
+
+    #[test]
+    fn it_processes_after_args() {
+        let expected = Args {
+            users: vec![],
+            date: "".to_string(),
+            date_sign: ">".to_string(),
+            config_path: "".to_string(),
+        };
+
+        assert_eq!(
+            expected,
+            process_args(vec![Arg("-after".to_string(), "".to_string())])
+        );
+    }
+
+    #[test]
+    fn it_processes_before_args() {
+        let expected = Args {
+            users: vec![],
+            date: "".to_string(),
+            date_sign: "<".to_string(),
+            config_path: "".to_string(),
+        };
+
+        assert_eq!(
+            expected,
+            process_args(vec![Arg("-before".to_string(), "".to_string())])
+        );
+    }
+
+    #[test]
+    fn it_processes_config_path_args() {
+        let expected = Args {
+            users: vec![],
+            date: "".to_string(),
+            date_sign: "".to_string(),
+            config_path: "../config/location.json".to_string(),
+        };
+
+        assert_eq!(
+            expected,
+            process_args(vec![Arg(
+                "--config-path".to_string(),
+                "../config/location.json".to_string()
+            )])
+        );
     }
 }
