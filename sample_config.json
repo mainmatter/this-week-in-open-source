@@ -20,5 +20,6 @@
       "name": "Ruby",
       "repos": []
     }
-  ]
+  ],
+  "exclude": ["Turbo87/aprs-parser-rs", "Turbo87/sentry-conduit"]
 }

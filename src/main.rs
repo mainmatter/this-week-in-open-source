@@ -29,6 +29,8 @@ struct FileConfig {
     header: Vec<String>,
     #[serde(default)]
     users: Vec<String>,
+    #[serde(default)]
+    exclude: Vec<String>,
 }
 
 fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn Error>> {
@@ -272,6 +274,10 @@ async fn main() -> octocrab::Result<()> {
                 args.users.clone()
             };
             let mut items = get_user_items(&octocrab, users, &args).await;
+            items = items
+                .into_iter()
+                .filter(|item| !config.exclude.contains(&item.repository_name))
+                .collect::<Vec<_>>();
 
             items.sort_by_key(|item| item.repository_name.clone());
             let markdown_definitions = extract_definitions(&items);
