@@ -13,16 +13,27 @@ const BREAK_LINE: &str = r#"
 
 "#;
 
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+enum ItemMergeStatus {
+    Merged,
+    NotMerged,
+    Unknown,
+}
+
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug, Clone)]
 struct Item {
     issue_number: String,
     issue_title: String,
     issue_url: String,
+    organization_name: String,
     repository_name: String,
+    full_repository_name: String,
     repository_url: String,
     user_login: String,
     user_url: String,
+    state: String, // "open", "closed"
+    merge_status: ItemMergeStatus,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -54,7 +65,7 @@ async fn get_prs(
 fn format_item(user_login: String, item: &Item) -> String {
     format!(
         "- [{}] [#{}]({}) {} ([@{}])",
-        item.repository_name, item.issue_number, item.issue_url, item.issue_title, user_login
+        item.full_repository_name, item.issue_number, item.issue_url, item.issue_title, user_login
     )
 }
 
@@ -90,8 +101,12 @@ async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item
                     issue_number: issue.number.to_string(),
                     issue_title: issue.title.clone(),
                     issue_url: url.to_string(),
-                    repository_name: format!("{}/{}", path_parts[0], path_parts[1]),
+                    organization_name: path_parts[0].to_string(),
+                    repository_name: path_parts[1].to_string(),
+                    full_repository_name: format!("{}/{}", path_parts[0], path_parts[1]),
                     repository_url: repository_url_parts.join("/"),
+                    state: issue.state.clone(),
+                    merge_status: ItemMergeStatus::Unknown,
                 });
             }
             page = match octocrab.get_page(&page.next).await.unwrap() {
@@ -106,6 +121,25 @@ async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item
     items
 }
 
+async fn set_item_merge_status(octocrab: &Octocrab, items: &mut Vec<Item>) -> () {
+    for mut item in items {
+        match octocrab
+            .pulls(item.organization_name.clone(), item.repository_name.clone())
+            .is_merged(item.issue_number.parse::<u64>().unwrap())
+            .await
+        {
+            Ok(is_merged) => {
+                if is_merged {
+                    item.merge_status = ItemMergeStatus::Merged
+                } else {
+                    item.merge_status = ItemMergeStatus::NotMerged
+                }
+            }
+            Err(_) => item.merge_status = ItemMergeStatus::Unknown,
+        }
+    }
+}
+
 fn extract_definitions(items: &Vec<Item>) -> Vec<String> {
     let mut unique_users = HashSet::new();
     let mut unique_repositories = HashSet::new();
@@ -114,7 +148,7 @@ fn extract_definitions(items: &Vec<Item>) -> Vec<String> {
         unique_users.insert(format!("[@{}]: {}", item.user_login, item.user_url));
         unique_repositories.insert(format!(
             "[{}]: {}",
-            item.repository_name, item.repository_url
+            item.full_repository_name, item.repository_url
         ));
     }
 
@@ -153,7 +187,7 @@ fn match_items_with_labels<'a>(
     for item in items {
         let labelled_item = labelled_items
             .into_iter()
-            .find(|label| label.repos.contains(&item.repository_name));
+            .find(|label| label.repos.contains(&item.full_repository_name));
 
         match labelled_item {
             Some(labelled_item) => {
@@ -182,9 +216,20 @@ async fn main() -> octocrab::Result<()> {
     let mut items = get_user_items(&octocrab, &app_params).await;
     items = items
         .into_iter()
-        .filter(|item| !app_params.exclude.contains(&item.repository_name))
+        .filter(|item| !app_params.exclude.contains(&item.full_repository_name))
         .collect::<Vec<_>>();
-    items.sort_by_key(|item| item.repository_name.clone());
+    set_item_merge_status(&octocrab, &mut items).await;
+    items.sort_by_key(|item| item.full_repository_name.clone());
+    items = items
+        .into_iter()
+        .filter(|item| {
+            if item.merge_status == ItemMergeStatus::NotMerged && item.state == "closed" {
+                false
+            } else {
+                true
+            }
+        })
+        .collect::<Vec<_>>();
     let markdown_definitions = extract_definitions(&items);
 
     let mut file = File::create(format!("{}.md", app_params.date)).unwrap();
@@ -237,19 +282,27 @@ mod tests {
                 issue_number: "63".to_string(),
                 issue_title: "Update nan".to_string(),
                 issue_url: "https://github.com/atom/keyboard-layout/pull/63".to_string(),
-                repository_name: "atom/keyboard-layout".to_string(),
+                organization_name: "atom".to_string(),
+                repository_name: "keyboard-layout".to_string(),
+                full_repository_name: "atom/keyboard-layout".to_string(),
                 repository_url: "https://github.com/atom/keyboard-layout".to_string(),
                 user_login: "mansona".to_string(),
                 user_url: "https://github.com/mansona".to_string(),
+                state: "closed".to_string(),
+                merge_status: ItemMergeStatus::Unknown,
             },
             Item {
                 issue_number: "798".to_string(),
                 issue_title: "Ember 4 compatibility".to_string(),
                 issue_url: "https://github.com/ember-engines/ember-engines/pull/798".to_string(),
-                repository_name: "ember-engines/ember-engines".to_string(),
+                organization_name: "ember-engines".to_string(),
+                repository_name: "ember-engines".to_string(),
+                full_repository_name: "ember-engines/ember-engines".to_string(),
                 repository_url: "https://github.com/ember-engines/ember-engines".to_string(),
                 user_login: "BobrImperator".to_string(),
                 user_url: "https://github.com/BobrImperator".to_string(),
+                state: "open".to_string(),
+                merge_status: ItemMergeStatus::Unknown,
             },
         ]
     }
