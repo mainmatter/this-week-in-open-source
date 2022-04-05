@@ -1,4 +1,11 @@
+use serde;
+use serde::Deserialize;
+use serde_json;
 use std::env;
+use std::error::Error;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
 
 #[derive(Debug)]
 struct Arg(String, String);
@@ -12,8 +19,64 @@ pub struct Args {
     pub config_path: String,
 }
 
-pub fn args() -> Args {
-    process_args(read_args())
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Deserialize, Clone, Debug)]
+pub struct LabelConfig {
+    pub name: String,
+    pub repos: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct FileConfig {
+    labels: Vec<LabelConfig>,
+    #[serde(default)]
+    header: Vec<String>,
+    #[serde(default)]
+    users: Vec<String>,
+    #[serde(default)]
+    exclude: Vec<String>,
+}
+
+impl FileConfig {
+    fn new() -> Self {
+        FileConfig {
+            labels: vec![],
+            header: vec![],
+            users: vec![],
+            exclude: vec![],
+        }
+    }
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
+pub struct AppParams {
+    pub labels: Vec<LabelConfig>,
+    pub header: Vec<String>,
+    pub users: Vec<String>,
+    pub exclude: Vec<String>,
+    pub date: String,
+    pub date_sign: String,
+    pub config_path: String,
+}
+
+pub fn args() -> AppParams {
+    let args = process_args(read_args());
+    let file_config = read_config_from_file(args.config_path.clone()).unwrap_or(FileConfig::new());
+
+    AppParams {
+        labels: file_config.labels,
+        header: file_config.header,
+        users: if file_config.users.len() > 0 {
+            file_config.users
+        } else {
+            args.users
+        },
+        exclude: file_config.exclude,
+        date: args.date,
+        date_sign: args.date_sign,
+        config_path: args.config_path,
+    }
 }
 
 fn read_args() -> Vec<Arg> {
@@ -70,10 +133,18 @@ fn process_args(pairs: Vec<Arg>) -> Args {
     args
 }
 
+fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn Error>> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+
+    let config = serde_json::from_reader(reader)?;
+
+    Ok(config)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::{process_args, Arg};
 
     #[test]
     fn it_processes_args() {
@@ -183,6 +254,22 @@ mod tests {
                 "--config-path".to_string(),
                 "../config/location.json".to_string()
             )])
+        );
+    }
+
+    #[test]
+    fn it_returns_app_params_with_defaults() {
+        assert_eq!(
+            AppParams {
+                labels: vec![],
+                header: vec![],
+                users: vec![],
+                exclude: vec![],
+                config_path: "".to_string(),
+                date: "".to_string(),
+                date_sign: "".to_string()
+            },
+            args()
         );
     }
 }
