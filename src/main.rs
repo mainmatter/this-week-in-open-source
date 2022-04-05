@@ -1,41 +1,17 @@
 use octocrab::{models, Octocrab};
 use serde;
 use serde::Deserialize;
-use serde_json;
 use std::collections::HashSet;
 use std::env;
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::BufReader;
-use std::path::Path;
 
 mod cli;
-use cli::{args, Args};
+use cli::{args, AppParams};
 
 const BREAK_LINE: &str = r#"
 
 "#;
-
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Clone, Debug)]
-struct RepoConfig {
-    name: String,
-    repos: Vec<String>,
-    #[serde(default)]
-    items: Vec<Item>,
-}
-
-#[derive(Deserialize)]
-struct FileConfig {
-    labels: Vec<RepoConfig>,
-    #[serde(default)]
-    header: Vec<String>,
-    #[serde(default)]
-    users: Vec<String>,
-    #[serde(default)]
-    exclude: Vec<String>,
-}
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug, Clone)]
@@ -49,13 +25,12 @@ struct Item {
     user_url: String,
 }
 
-fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn Error>> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-
-    let config = serde_json::from_reader(reader)?;
-
-    Ok(config)
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
+struct LabelledItem {
+    name: String,
+    repos: Vec<String>,
+    items: Vec<Item>,
 }
 
 async fn get_prs(
@@ -83,15 +58,15 @@ fn format_item(user_login: String, item: &Item) -> String {
     )
 }
 
-fn format_label(repo: &RepoConfig) -> String {
+fn format_label(repo: &LabelledItem) -> String {
     format!("## {}", repo.name)
 }
 
-async fn get_user_items(octocrab: &Octocrab, users: Vec<String>, args: &Args) -> Vec<Item> {
+async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item> {
     let mut items: Vec<Item> = vec![];
 
-    for user in users {
-        let mut page = get_prs(&octocrab, &user, &args.date_sign, &args.date)
+    for user in app_params.users.clone() {
+        let mut page = get_prs(&octocrab, &user, &app_params.date_sign, &app_params.date)
             .await
             .unwrap();
 
@@ -170,25 +145,25 @@ async fn initialize_octocrab() -> octocrab::Result<Octocrab> {
 }
 
 fn match_items_with_labels<'a>(
-    repos: &'a mut Vec<RepoConfig>,
+    labelled_items: &'a mut Vec<LabelledItem>,
     items: &Vec<Item>,
-) -> (&'a Vec<RepoConfig>, Vec<Item>) {
+) -> (&'a Vec<LabelledItem>, Vec<Item>) {
     let mut unknown_items: Vec<Item> = vec![];
 
     for item in items {
-        let label = repos
+        let labelled_item = labelled_items
             .into_iter()
             .find(|label| label.repos.contains(&item.repository_name));
 
-        match label {
-            Some(label) => {
-                label.items.push(item.clone());
+        match labelled_item {
+            Some(labelled_item) => {
+                labelled_item.items.push(item.clone());
             }
             None => unknown_items.push(item.clone()),
         }
     }
 
-    (repos, unknown_items)
+    (labelled_items, unknown_items)
 }
 
 fn format_items(items: &Vec<Item>) -> Vec<String> {
@@ -202,75 +177,52 @@ fn format_items(items: &Vec<Item>) -> Vec<String> {
 async fn main() -> octocrab::Result<()> {
     let octocrab = initialize_octocrab().await?;
 
-    let args = args();
-    match read_config_from_file(args.config_path.clone()) {
-        Ok(config) => {
-            let mut repos = config.labels.clone();
-            repos.sort_by_key(|label| label.name.clone());
+    let app_params = args();
 
-            let users = if config.users.len() > 0 {
-                config.users.clone()
-            } else {
-                args.users.clone()
-            };
-            let mut items = get_user_items(&octocrab, users, &args).await;
-            items = items
-                .into_iter()
-                .filter(|item| !config.exclude.contains(&item.repository_name))
-                .collect::<Vec<_>>();
+    let mut items = get_user_items(&octocrab, &app_params).await;
+    items = items
+        .into_iter()
+        .filter(|item| !app_params.exclude.contains(&item.repository_name))
+        .collect::<Vec<_>>();
+    items.sort_by_key(|item| item.repository_name.clone());
+    let markdown_definitions = extract_definitions(&items);
 
-            items.sort_by_key(|item| item.repository_name.clone());
-            let markdown_definitions = extract_definitions(&items);
+    let mut file = File::create(format!("{}.md", app_params.date)).unwrap();
 
-            let mut file = File::create(format!("{}.md", args.date)).unwrap();
+    let mut labelled_items = app_params
+        .labels
+        .clone()
+        .into_iter()
+        .map(|label| LabelledItem {
+            name: label.name,
+            repos: label.repos,
+            items: vec![],
+        })
+        .collect::<Vec<LabelledItem>>();
+    let (labels, unknown_items) = match_items_with_labels(&mut labelled_items, &items);
 
-            let (labels, unknown_items) = match_items_with_labels(&mut repos, &items);
+    let mut content: Vec<String> = vec![];
 
-            let mut content: Vec<String> = vec![];
-
-            for (i, label) in labels.iter().filter(|i| i.items.len() > 0).enumerate() {
-                if i > 0 {
-                    content.push(String::from(""));
-                }
-                content.push(format_label(&label));
-                content.push(String::from(""));
-                content.append(&mut format_items(&label.items));
-            }
-
-            if unknown_items.len() > 0 {
-                content.push(String::from(""));
-                content.push(String::from("## Unknown"));
-                content.push(String::from(""));
-                content.append(&mut format_items(&unknown_items));
-            }
-
-            file.write_all(config.header.join("\n").as_bytes());
-            file.write_all(content.join("\n").as_bytes());
-            file.write(BREAK_LINE.as_bytes());
-            file.write_all(markdown_definitions.join("\n").as_bytes());
+    for (i, label) in labels.iter().filter(|i| i.items.len() > 0).enumerate() {
+        if i > 0 {
+            content.push(String::from(""));
         }
-        Err(e) => {
-            println!(
-                "Couldn't open configuration file '--config-path={}'",
-                args.config_path.clone()
-            );
-            println!("{}", e);
-            let mut items = get_user_items(&octocrab, args.users.clone(), &args).await;
-
-            items.sort_by_key(|item| item.repository_name.clone());
-            let markdown_definitions = extract_definitions(&items);
-
-            let mut file = File::create(format!("{}.md", args.date)).unwrap();
-
-            let mut content: Vec<String> = vec![];
-
-            content.append(&mut format_items(&items));
-
-            file.write_all(content.join("\n").as_bytes());
-            file.write(BREAK_LINE.as_bytes());
-            file.write_all(markdown_definitions.join("\n").as_bytes());
-        }
+        content.push(format_label(&label));
+        content.push(String::from(""));
+        content.append(&mut format_items(&label.items));
     }
+
+    if unknown_items.len() > 0 {
+        content.push(String::from(""));
+        content.push(String::from("## Unknown"));
+        content.push(String::from(""));
+        content.append(&mut format_items(&unknown_items));
+    }
+
+    file.write_all(app_params.header.join("\n").as_bytes());
+    file.write_all(content.join("\n").as_bytes());
+    file.write(BREAK_LINE.as_bytes());
+    file.write_all(markdown_definitions.join("\n").as_bytes());
 
     Ok(())
 }
@@ -302,8 +254,8 @@ mod tests {
         ]
     }
 
-    fn repo_configs_helper() -> Vec<RepoConfig> {
-        vec![RepoConfig {
+    fn repo_configs_helper() -> Vec<LabelledItem> {
+        vec![LabelledItem {
             name: "Ember".to_string(),
             repos: vec!["ember-engines/ember-engines".to_string()],
             items: vec![],
@@ -344,13 +296,18 @@ mod tests {
     #[test]
     fn it_matches_items_with_labels() {
         let items = items_helper();
-        let mut repo_configs = repo_configs_helper();
         let atom_keyboard_item = items[0].clone();
         let ember_engines_item = items[1].clone();
 
-        let labels_result = match_items_with_labels(&mut repo_configs, &items);
+        let mut labelled_items = vec![LabelledItem {
+            name: "Ember".to_string(),
+            repos: vec!["ember-engines/ember-engines".to_string()],
+            items: vec![],
+        }];
+
+        let labels_result = match_items_with_labels(&mut labelled_items, &items);
         let expected = (
-            &vec![RepoConfig {
+            &vec![LabelledItem {
                 name: "Ember".to_string(),
                 repos: vec!["ember-engines/ember-engines".to_string()],
                 items: vec![ember_engines_item],
