@@ -104,6 +104,16 @@ This will replace the `--users` cli option when both are present.
 
 ```
 
+- `exclude_closed_not_merged` A boolean that either enables or disables filtering of manually closed PRs.
+i.e PRs that weren't merged and are in closed state.
+
+```json
+// sample_config.json
+{
+  "exclude_closed_not_merged": true
+}
+```
+
 ### Deploy
 So far there isn't anything exciting for deploying it :)
 If you wish to create a binary then run: `cargo build --target x86_64-apple-darwin --release --target-dir=bin`
