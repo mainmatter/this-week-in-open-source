@@ -140,6 +140,19 @@ async fn set_item_merge_status(octocrab: &Octocrab, items: &mut Vec<Item>) -> ()
     }
 }
 
+fn filter_items_by_merge_status(items: Vec<Item>) -> Vec<Item> {
+    items
+        .into_iter()
+        .filter(|item| {
+            if item.merge_status == ItemMergeStatus::NotMerged && item.state == "closed" {
+                false
+            } else {
+                true
+            }
+        })
+        .collect::<Vec<_>>()
+}
+
 fn extract_definitions(items: &Vec<Item>) -> Vec<String> {
     let mut unique_users = HashSet::new();
     let mut unique_repositories = HashSet::new();
@@ -220,16 +233,7 @@ async fn main() -> octocrab::Result<()> {
         .collect::<Vec<_>>();
     set_item_merge_status(&octocrab, &mut items).await;
     if app_params.exclude_closed_not_merged {
-        items = items
-            .into_iter()
-            .filter(|item| {
-                if item.merge_status == ItemMergeStatus::NotMerged && item.state == "closed" {
-                    false
-                } else {
-                    true
-                }
-            })
-            .collect::<Vec<_>>();
+        items = filter_items_by_merge_status(items);
     }
     items.sort_by_key(|item| item.full_repository_name.clone());
     let markdown_definitions = extract_definitions(&items);
@@ -371,5 +375,38 @@ mod tests {
         );
 
         assert_eq!(expected, labels_result);
+    }
+
+    #[test]
+    fn it_filters_not_merged_items() {
+        let items = vec![
+            Item {
+                issue_number: "63".to_string(),
+                issue_title: "Update nan".to_string(),
+                issue_url: "https://github.com/atom/keyboard-layout/pull/63".to_string(),
+                organization_name: "atom".to_string(),
+                repository_name: "keyboard-layout".to_string(),
+                full_repository_name: "atom/keyboard-layout".to_string(),
+                repository_url: "https://github.com/atom/keyboard-layout".to_string(),
+                user_login: "mansona".to_string(),
+                user_url: "https://github.com/mansona".to_string(),
+                state: "closed".to_string(),
+                merge_status: ItemMergeStatus::NotMerged,
+            },
+            Item {
+                issue_number: "798".to_string(),
+                issue_title: "Ember 4 compatibility".to_string(),
+                issue_url: "https://github.com/ember-engines/ember-engines/pull/798".to_string(),
+                organization_name: "ember-engines".to_string(),
+                repository_name: "ember-engines".to_string(),
+                full_repository_name: "ember-engines/ember-engines".to_string(),
+                repository_url: "https://github.com/ember-engines/ember-engines".to_string(),
+                user_login: "BobrImperator".to_string(),
+                user_url: "https://github.com/BobrImperator".to_string(),
+                state: "open".to_string(),
+                merge_status: ItemMergeStatus::Unknown,
+            },
+        ];
+        assert_eq!(vec![items[1].clone()], filter_items_by_merge_status(items))
     }
 }
