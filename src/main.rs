@@ -9,6 +9,8 @@ use std::io::prelude::*;
 mod cli;
 use cli::{args, AppParams};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 const BREAK_LINE: &str = r#"
 
 "#;
@@ -222,6 +224,8 @@ fn format_items(items: &Vec<Item>) -> Vec<String> {
 
 #[tokio::main]
 async fn main() -> octocrab::Result<()> {
+    println!("Using this-week-in-open-source v{}", VERSION);
+
     let octocrab = initialize_octocrab().await?;
 
     let app_params = args();
@@ -275,6 +279,7 @@ async fn main() -> octocrab::Result<()> {
     file.write(BREAK_LINE.as_bytes());
     file.write_all(markdown_definitions.join("\n").as_bytes());
 
+    println!("Done! :)");
     Ok(())
 }
 
