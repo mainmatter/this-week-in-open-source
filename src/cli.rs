@@ -35,11 +35,14 @@ struct FileConfig {
     users: Vec<String>,
     #[serde(default)]
     exclude: Vec<String>,
+    #[serde(default)]
+    exclude_closed_not_merged: bool,
 }
 
 impl FileConfig {
     fn new() -> Self {
         FileConfig {
+            exclude_closed_not_merged: false,
             labels: vec![],
             header: vec![],
             users: vec![],
@@ -51,6 +54,7 @@ impl FileConfig {
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 pub struct AppParams {
+    pub exclude_closed_not_merged: bool,
     pub labels: Vec<LabelConfig>,
     pub header: Vec<String>,
     pub users: Vec<String>,
@@ -65,6 +69,7 @@ pub fn args() -> AppParams {
     let file_config = read_config_from_file(args.config_path.clone()).unwrap_or(FileConfig::new());
 
     AppParams {
+        exclude_closed_not_merged: file_config.exclude_closed_not_merged,
         labels: file_config.labels,
         header: file_config.header,
         users: if file_config.users.len() > 0 {
@@ -261,6 +266,7 @@ mod tests {
     fn it_returns_app_params_with_defaults() {
         assert_eq!(
             AppParams {
+                exclude_closed_not_merged: false,
                 labels: vec![],
                 header: vec![],
                 users: vec![],
