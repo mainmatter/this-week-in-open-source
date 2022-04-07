@@ -1054,7 +1054,7 @@ dependencies = [
 
 [[package]]
 name = "this-week-in-open-source"
-version = "0.1.0"
+version = "0.4.0"
 dependencies = [
  "futures",
  "octocrab",
