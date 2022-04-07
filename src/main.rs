@@ -219,17 +219,19 @@ async fn main() -> octocrab::Result<()> {
         .filter(|item| !app_params.exclude.contains(&item.full_repository_name))
         .collect::<Vec<_>>();
     set_item_merge_status(&octocrab, &mut items).await;
+    if app_params.exclude_closed_not_merged {
+        items = items
+            .into_iter()
+            .filter(|item| {
+                if item.merge_status == ItemMergeStatus::NotMerged && item.state == "closed" {
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect::<Vec<_>>();
+    }
     items.sort_by_key(|item| item.full_repository_name.clone());
-    items = items
-        .into_iter()
-        .filter(|item| {
-            if item.merge_status == ItemMergeStatus::NotMerged && item.state == "closed" {
-                false
-            } else {
-                true
-            }
-        })
-        .collect::<Vec<_>>();
     let markdown_definitions = extract_definitions(&items);
 
     let mut file = File::create(format!("{}.md", app_params.date)).unwrap();
