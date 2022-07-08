@@ -222,7 +222,7 @@ fn format_items(items: &Vec<Item>) -> Vec<String> {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> octocrab::Result<()> {
     println!("Using this-week-in-open-source v{}", VERSION);
     println!("");
 
