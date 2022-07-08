@@ -26,7 +26,7 @@ pub struct LabelConfig {
     pub repos: Vec<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct FileConfig {
     labels: Vec<LabelConfig>,
     #[serde(default)]
@@ -37,18 +37,6 @@ struct FileConfig {
     exclude: Vec<String>,
     #[serde(default)]
     exclude_closed_not_merged: bool,
-}
-
-impl FileConfig {
-    fn new() -> Self {
-        FileConfig {
-            exclude_closed_not_merged: false,
-            labels: vec![],
-            header: vec![],
-            users: vec![],
-            exclude: vec![],
-        }
-    }
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -66,21 +54,41 @@ pub struct AppParams {
 
 pub fn args() -> AppParams {
     let args = process_args(read_args());
-    let file_config = read_config_from_file(args.config_path.clone()).unwrap_or(FileConfig::new());
 
-    AppParams {
-        exclude_closed_not_merged: file_config.exclude_closed_not_merged,
-        labels: file_config.labels,
-        header: file_config.header,
-        users: if file_config.users.len() > 0 {
-            file_config.users
-        } else {
-            args.users
+    match read_config_from_file(args.config_path.clone()) {
+        Ok(file_config) => AppParams {
+            labels: file_config.labels,
+            header: file_config.header,
+            exclude: file_config.exclude,
+            users: file_config.users,
+            exclude_closed_not_merged: file_config.exclude_closed_not_merged,
+            date: args.date,
+            date_sign: args.date_sign,
+            config_path: args.config_path,
         },
-        exclude: file_config.exclude,
-        date: args.date,
-        date_sign: args.date_sign,
-        config_path: args.config_path,
+        Err(error) => {
+            println!("");
+            if args.config_path.len() == 0 {
+                println!("--config-path is not provided.");
+                println!("This will result with unlabelled items.");
+            } else {
+                println!("There was a problem reading your config file.");
+                println!("Check if your config file is correct and valid.");
+                println!("");
+                println!("{:?}", error);
+            }
+
+            AppParams {
+                labels: vec![],
+                header: vec![],
+                exclude: vec![],
+                exclude_closed_not_merged: false,
+                users: args.users,
+                date: args.date,
+                date_sign: args.date_sign,
+                config_path: args.config_path,
+            }
+        }
     }
 }
 
@@ -128,11 +136,6 @@ fn process_args(pairs: Vec<Arg>) -> Args {
             ("--config-path", value) => args.config_path = value.to_string(),
             (name, value) => println!("Could not handle argument {} with value {}", name, value),
         }
-    }
-
-    if args.config_path.len() == 0 {
-        println!("--config-path is not provided.");
-        println!("This will result with unlabelled items.");
     }
 
     args

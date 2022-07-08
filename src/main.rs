@@ -3,6 +3,7 @@ use serde;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::env;
+use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -182,14 +183,12 @@ fn extract_definitions(items: &Vec<Item>) -> Vec<String> {
 }
 
 async fn initialize_octocrab() -> octocrab::Result<Octocrab> {
-    let (_, token) = env::vars()
-        .find(|(key, _)| key == "GITHUB_PERSONAL_TOKEN")
-        .unwrap_or((String::from("DEFAULT"), String::from("")));
-
-    if token.len() > 0 {
-        Octocrab::builder().personal_token(token).build()
-    } else {
-        Octocrab::builder().build()
+    match env::vars().find(|(key, _)| key == "GITHUB_PERSONAL_TOKEN") {
+        Some((_key, token)) => Octocrab::builder().personal_token(token).build(),
+        None => {
+            println!("GITHUB_PERSONAL_TOKEN was not provided.");
+            Octocrab::builder().build()
+        }
     }
 }
 
@@ -223,8 +222,9 @@ fn format_items(items: &Vec<Item>) -> Vec<String> {
 }
 
 #[tokio::main]
-async fn main() -> octocrab::Result<()> {
+async fn main() -> Result<(), Box<dyn Error>> {
     println!("Using this-week-in-open-source v{}", VERSION);
+    println!("");
 
     let octocrab = initialize_octocrab().await?;
 
@@ -279,7 +279,9 @@ async fn main() -> octocrab::Result<()> {
     file.write(BREAK_LINE.as_bytes());
     file.write_all(markdown_definitions.join("\n").as_bytes());
 
+    println!("");
     println!("Done! :)");
+
     Ok(())
 }
 
