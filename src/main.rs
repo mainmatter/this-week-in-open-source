@@ -1,9 +1,8 @@
 use octocrab::{models, Octocrab};
 use serde;
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::{collections::HashSet, io};
 use std::env;
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -53,6 +52,13 @@ async fn get_prs(
     date_sign: &String,
     date: &String,
 ) -> octocrab::Result<octocrab::Page<models::issues::Issue>, octocrab::Error> {
+    println!(
+            "is:pr author:{} created:{}{}",
+            user.as_str(),
+            date_sign.as_str(),
+            date.as_str(),
+        );
+
     octocrab
         .search()
         .issues_and_pull_requests(&format!(
@@ -125,7 +131,7 @@ async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item
 }
 
 async fn set_item_merge_status(octocrab: &Octocrab, items: &mut Vec<Item>) -> () {
-    for mut item in items {
+    for item in items {
         match octocrab
             .pulls(item.organization_name.clone(), item.repository_name.clone())
             .is_merged(item.issue_number.parse::<u64>().unwrap())
@@ -221,6 +227,38 @@ fn format_items(items: &Vec<Item>) -> Vec<String> {
         .collect::<Vec<String>>()
 }
 
+fn write_twios_file_contents(content: &mut Vec<String>, labels: &Vec<LabelledItem>, unknown_items: &Vec<Item>) {
+    for (i, label) in labels.iter().filter(|i| i.items.len() > 0).enumerate() {
+        if i > 0 {
+            content.push(String::from(""));
+        }
+        content.push(format_label(&label));
+        content.push(String::from(""));
+        content.append(&mut format_items(&label.items));
+    }
+
+    if unknown_items.len() > 0 {
+        content.push(String::from(""));
+        content.push(String::from("## Unknown"));
+        content.push(String::from(""));
+        content.append(&mut format_items(unknown_items));
+    }
+}
+
+fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParams, labels: &Vec<LabelledItem>, unknown_items: &Vec<Item>) {
+    content.push(format!("- TWIOS_PATH {}", app_params.output_path));
+    content.push(format!("- TWIOS_DATE {}", app_params.date));
+    content.push(format!("- TWIOS_CATEGORIES {:?}", labels.into_iter().map(|item| item.name.clone()).collect::<Vec<_>>().join(",")));
+    content.push("- TWIOS_UNLABELLED".to_string());
+
+    for item in unknown_items.iter() {
+    content.push(format!(
+        "  - [{}] UNKNOWN",
+        item.full_repository_name
+    ));
+    }
+}
+
 #[tokio::main]
 async fn main() -> octocrab::Result<()> {
     println!("Using this-week-in-open-source v{}", VERSION);
@@ -242,7 +280,10 @@ async fn main() -> octocrab::Result<()> {
     items.sort_by_key(|item| item.full_repository_name.clone());
     let markdown_definitions = extract_definitions(&items);
 
-    let mut file = File::create(format!("{}.md", app_params.date)).unwrap();
+    let split_date = app_params.date.split("..").collect::<Vec<_>>();
+    let file_name = split_date[0];
+
+    let mut file = File::create(format!("{}.md", file_name)).unwrap();
 
     let mut labelled_items = app_params
         .labels
@@ -256,31 +297,35 @@ async fn main() -> octocrab::Result<()> {
         .collect::<Vec<LabelledItem>>();
     let (labels, unknown_items) = match_items_with_labels(&mut labelled_items, &items);
 
-    let mut content: Vec<String> = vec![];
+    match app_params.context {
+        cli::CliContext::TWIOS => {
+            let mut file_content: Vec<String> = vec![];
+            write_twios_file_contents(&mut file_content, &labels, &unknown_items);
 
-    for (i, label) in labels.iter().filter(|i| i.items.len() > 0).enumerate() {
-        if i > 0 {
-            content.push(String::from(""));
-        }
-        content.push(format_label(&label));
-        content.push(String::from(""));
-        content.append(&mut format_items(&label.items));
-    }
-
-    if unknown_items.len() > 0 {
-        content.push(String::from(""));
-        content.push(String::from("## Unknown"));
-        content.push(String::from(""));
-        content.append(&mut format_items(&unknown_items));
-    }
-
-    file.write_all(app_params.header.join("\n").as_bytes());
-    file.write_all(content.join("\n").as_bytes());
-    file.write(BREAK_LINE.as_bytes());
-    file.write_all(markdown_definitions.join("\n").as_bytes());
-
+            file.write_all(app_params.header.join("\n").as_bytes()).unwrap();
+            file.write_all(file_content.join("\n").as_bytes()).unwrap();
+            file.write(BREAK_LINE.as_bytes()).unwrap();
+            file.write_all(markdown_definitions.join("\n").as_bytes()).unwrap();
     println!("");
     println!("Done! :)");
+
+        },
+        cli::CliContext::COMMENT => {
+            let mut comment_content: Vec<String> = vec![];
+            write_twios_comment_contents(&mut comment_content, &app_params, &labels, &unknown_items);
+            let twios_comment = cli::TwiosComment {
+                body: app_params.comment_body.clone()
+            };
+
+            let output = twios_comment.read();
+
+            format!("{:?}", output);
+
+            // modify file
+            io::stdout().write_all(comment_content.join("\n").as_bytes()).unwrap();
+        }
+    }
+
 
     Ok(())
 }
