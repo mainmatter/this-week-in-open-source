@@ -1,4 +1,3 @@
-use futures::AsyncReadExt;
 use regex::Regex;
 use serde;
 use serde::Deserialize;
@@ -8,6 +7,12 @@ use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+
+#[derive(PartialEq, Debug)]
+pub enum CLI_CONTEXT {
+    TWIOS,
+    COMMENT,
+}
 
 #[derive(Debug)]
 struct Arg(String, String);
@@ -19,6 +24,7 @@ pub struct Args {
     pub date: String,
     pub date_sign: String,
     pub config_path: String,
+    pub context: String,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -39,6 +45,8 @@ struct FileConfig {
     exclude: Vec<String>,
     #[serde(default)]
     exclude_closed_not_merged: bool,
+    #[serde(default)]
+    output_path: String,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -52,10 +60,14 @@ pub struct AppParams {
     pub date: String,
     pub date_sign: String,
     pub config_path: String,
+    pub output_path: String,
+    pub context: CLI_CONTEXT,
 }
 
 pub fn args() -> AppParams {
     let args = process_args(read_args());
+
+    let cli_context = if args.context == "twios_comment" { CLI_CONTEXT::COMMENT } else { CLI_CONTEXT::TWIOS };
 
     match read_config_from_file(args.config_path.clone()) {
         Ok(file_config) => AppParams {
@@ -67,9 +79,10 @@ pub fn args() -> AppParams {
             date: args.date,
             date_sign: args.date_sign,
             config_path: args.config_path,
+            output_path: file_config.output_path,
+            context: cli_context,
         },
         Err(error) => {
-            println!("");
             if args.config_path.len() == 0 {
                 println!("--config-path is not provided.");
                 println!("This will result with unlabelled items.");
@@ -89,6 +102,8 @@ pub fn args() -> AppParams {
                 date: args.date,
                 date_sign: args.date_sign,
                 config_path: args.config_path,
+                output_path: "".to_string(),
+                context: cli_context,
             }
         }
     }
@@ -118,10 +133,14 @@ fn process_args(pairs: Vec<Arg>) -> Args {
         date: String::from(""),
         date_sign: String::from(""),
         config_path: String::from(""),
+        context: String::from(""),
     };
 
     for pair in pairs {
         match (pair.0.as_str(), pair.1.as_str()) {
+            ("comment", _value) => {
+                args.context = "twios_comment".to_string();
+            }
             ("--users", value) => {
                 args.users.append(
                     &mut value
@@ -224,18 +243,14 @@ impl TwiosComment {
             match keyword {
                 "TWIOS_PATH" => output.file_path = value.trim().to_string(),
                 "TWIOS_DATE" => output.date = value.trim().to_string(),
-                "TWIOS_CATEGORIES" => {
-                    let categories: Vec<String> =
-                        value.split(",").map(|s| s.trim().to_string()).collect();
-
-                    println!("Categories: {:?}", categories);
-                }
+               // "TWIOS_CATEGORIES" => {
+               //     let categories: Vec<String> =
+               //         value.split(",").map(|s| s.trim().to_string()).collect();
+               // }
                 "TWIOS_UNLABELLED" => {
                     let re_label = Regex::new(r"\[(?<repo>.*)\]\s+(?<label>\w+)").unwrap();
                     for line in value.split("\n") {
-                            println!("{:?}", line);
                         for capture in re_label.captures_iter(line) {
-                            println!("{:?}", capture);
                             let label = &capture["label"];
                             let repo = &capture["repo"];
                             if label == "EXCLUDED" {
@@ -278,6 +293,7 @@ mod tests {
             date: "".to_string(),
             date_sign: "".to_string(),
             config_path: "".to_string(),
+            context: "".to_string(),
         };
 
         assert_eq!(expected, process_args(vec![]));
@@ -290,6 +306,7 @@ mod tests {
             date: "".to_string(),
             date_sign: "".to_string(),
             config_path: "".to_string(),
+            context: "".to_string(),
         };
 
         assert_eq!(
@@ -308,6 +325,7 @@ mod tests {
             date: "".to_string(),
             date_sign: "".to_string(),
             config_path: "".to_string(),
+            context: "".to_string(),
         };
 
         assert_eq!(
@@ -326,6 +344,7 @@ mod tests {
             date: "2022-02-18".to_string(),
             date_sign: "".to_string(),
             config_path: "".to_string(),
+            context: "".to_string(),
         };
 
         assert_eq!(
@@ -341,6 +360,7 @@ mod tests {
             date: "".to_string(),
             date_sign: ">".to_string(),
             config_path: "".to_string(),
+            context: "".to_string(),
         };
 
         assert_eq!(
@@ -356,6 +376,7 @@ mod tests {
             date: "".to_string(),
             date_sign: "<".to_string(),
             config_path: "".to_string(),
+            context: "".to_string(),
         };
 
         assert_eq!(
@@ -371,6 +392,7 @@ mod tests {
             date: "".to_string(),
             date_sign: "".to_string(),
             config_path: "../config/location.json".to_string(),
+            context: "".to_string(),
         };
 
         assert_eq!(
@@ -393,7 +415,9 @@ mod tests {
                 exclude: vec![],
                 config_path: "".to_string(),
                 date: "".to_string(),
-                date_sign: "".to_string()
+                date_sign: "".to_string(),
+                output_path: "".to_string(),
+                context: CLI_CONTEXT::TWIOS
             },
             args()
         );
@@ -411,9 +435,8 @@ Available categories
 - TWIOS_CATEGORIES Ember,Javascript,Typescript
 - TWIOS_UNLABELLED 
  - [EmbarkStudios/spdx] UNKNOWN 
- - [mainmatter/ember-simple-auth] Ember 
+ - [mainmatter/ember-simple-auth] Ember  
  - [simplabs/ember-error-route] EXCLUDED
-
 - Doesn't catch this
             "#
             .to_string(),
