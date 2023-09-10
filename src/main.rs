@@ -52,6 +52,13 @@ async fn get_prs(
     date_sign: &String,
     date: &String,
 ) -> octocrab::Result<octocrab::Page<models::issues::Issue>, octocrab::Error> {
+    println!(
+            "is:pr author:{} created:{}{}",
+            user.as_str(),
+            date_sign.as_str(),
+            date.as_str(),
+        );
+
     octocrab
         .search()
         .issues_and_pull_requests(&format!(
@@ -273,7 +280,10 @@ async fn main() -> octocrab::Result<()> {
     items.sort_by_key(|item| item.full_repository_name.clone());
     let markdown_definitions = extract_definitions(&items);
 
-    let mut file = File::create(format!("{}.md", app_params.date)).unwrap();
+    let split_date = app_params.date.split("..").collect::<Vec<_>>();
+    let file_name = split_date[0];
+
+    let mut file = File::create(format!("{}.md", file_name)).unwrap();
 
     let mut labelled_items = app_params
         .labels

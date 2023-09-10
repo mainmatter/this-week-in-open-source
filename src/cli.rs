@@ -1,12 +1,13 @@
+use chrono::{Datelike, Days, NaiveDate, NaiveWeek, Weekday};
 use regex::Regex;
 use serde;
 use serde::Deserialize;
 use serde_json;
-use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+use std::{env, time::Duration};
 
 #[derive(PartialEq, Debug)]
 pub enum CLI_CONTEXT {
@@ -67,7 +68,11 @@ pub struct AppParams {
 pub fn args() -> AppParams {
     let args = process_args(read_args());
 
-    let cli_context = if args.context == "twios_comment" { CLI_CONTEXT::COMMENT } else { CLI_CONTEXT::TWIOS };
+    let cli_context = if args.context == "twios_comment" {
+        CLI_CONTEXT::COMMENT
+    } else {
+        CLI_CONTEXT::TWIOS
+    };
 
     match read_config_from_file(args.config_path.clone()) {
         Ok(file_config) => AppParams {
@@ -159,6 +164,19 @@ fn process_args(pairs: Vec<Arg>) -> Args {
         }
     }
 
+    if args.date == "" {
+        let now = chrono::offset::Utc::now();
+        let last_week = chrono::offset::Utc::now()
+            .checked_sub_days(Days::new(7))
+            .unwrap()
+            .naive_utc();
+        args.date = format!(
+            "{}..{}",
+            last_week.format("%Y-%m-%d"),
+            now.format("%Y-%m-%d")
+        );
+    }
+
     args
 }
 
@@ -243,10 +261,10 @@ impl TwiosComment {
             match keyword {
                 "TWIOS_PATH" => output.file_path = value.trim().to_string(),
                 "TWIOS_DATE" => output.date = value.trim().to_string(),
-               // "TWIOS_CATEGORIES" => {
-               //     let categories: Vec<String> =
-               //         value.split(",").map(|s| s.trim().to_string()).collect();
-               // }
+                // "TWIOS_CATEGORIES" => {
+                //     let categories: Vec<String> =
+                //         value.split(",").map(|s| s.trim().to_string()).collect();
+                // }
                 "TWIOS_UNLABELLED" => {
                     let re_label = Regex::new(r"\[(?<repo>.*)\]\s+(?<label>\w+)").unwrap();
                     for line in value.split("\n") {
