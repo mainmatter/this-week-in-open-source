@@ -16,19 +16,21 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Configure local git
+        run: |
+          git config --global user.email "twios@twios_test_dev.com"
+          git config --global user.name "TWIOS Dev"
       - name: Create TWIOS on schedule
         if: github.event.schedule || github.event.pull_request
         run: |
           COMMENT="$(GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=./sample_config.json)"
           FORMATTED_DATE="$(date +"%Y-%m-%d")"
           BRANCH_NAME="twios-$FORMATTED_DATE"
-          git config --global user.email "twios@twios_test_dev.com"
-          git config --global user.name "TWIOS Dev"
           git checkout -b $BRANCH_NAME
           mkdir -p twios/
           GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --users=BobrImperator --config-path=./sample_config.json
           git add . && git commit -m "$BRANCH_NAME"
-          gh pr create -B master -H $BRANCH_NAME --title "TWIOS $FORMATTED_DATE" --body "$(echo $COMMENT)"  
+          gh pr create --base main --head $BRANCH_NAME --title "TWIOS $FORMATTED_DATE" --body "$(echo $COMMENT)"  
     
   edit_twios:
     runs-on: ubuntu-latest
