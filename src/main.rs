@@ -246,14 +246,14 @@ fn write_twios_file_contents(content: &mut Vec<String>, labels: &Vec<LabelledIte
 }
 
 fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParams, labels: &Vec<LabelledItem>, unknown_items: &Vec<Item>) {
-    content.push(format!("- TWIOS_PATH {}", app_params.output_path));
-    content.push(format!("- TWIOS_DATE {}", app_params.date));
-    content.push(format!("- TWIOS_CATEGORIES {:?}", labels.into_iter().map(|item| item.name.clone()).collect::<Vec<_>>().join(",")));
-    content.push("- TWIOS_UNLABELLED".to_string());
+    content.push(format!("- TWIOS_PATH {} \n", app_params.output_path));
+    content.push(format!("- TWIOS_DATE {} \n", app_params.date));
+    content.push(format!("- TWIOS_CATEGORIES {:?} \n", labels.into_iter().map(|item| item.name.clone()).collect::<Vec<_>>().join(",")));
+    content.push("- TWIOS_UNLABELLED \n".to_string());
 
     for item in unknown_items.iter() {
     content.push(format!(
-        "  - [{}] UNKNOWN",
+        "  - [{}] UNKNOWN \n",
         item.full_repository_name
     ));
     }
