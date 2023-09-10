@@ -20,7 +20,13 @@ jobs:
         if: github.event.schedule || github.event.pull_request
         run: |
           COMMENT="$(GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=./sample_config.json)"
-          gh pr create -B master -H twios --title "TWIOS $(date)" --body "$(echo $COMMENT)"  
+          FORMATTED_DATE="$(date +"%Y-%m-%d")"
+          BRANCH_NAME="twios-$FORMATTED_DATE"
+          git checkout -b $BRANCH_NAME
+          mkdir -p twios/
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --users=BobrImperator --config-path=./sample_config.json
+          git add . && git commit -m "$BRANCH_NAME"
+          gh pr create -B master -H $BRANCH_NAME --title "TWIOS $FORMATTED_DATE" --body "$(echo $COMMENT)"  
     
   edit_twios:
     runs-on: ubuntu-latest
