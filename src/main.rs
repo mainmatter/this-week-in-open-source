@@ -321,8 +321,6 @@ async fn main() -> octocrab::Result<()> {
 
 
             // modify file
-
-            io::stdout().flush().unwrap();
             io::stdout().write_all(comment_content.join("\n").as_bytes()).unwrap();
         }
     }

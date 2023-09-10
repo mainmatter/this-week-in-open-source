@@ -1,0 +1,32 @@
+env:
+  COMMENT_BODY: ${{ github.event.comment.body }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+on:
+  schedule:
+    # Every Sunday 23:00
+    - cron: '0 23 * * 0'
+  issue_comment:
+    types: [edited]
+  pull_request:
+
+jobs:
+  create_twios:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Create TWIOS on schedule
+        if: github.event.schedule || github.event.pull_request
+        run: |
+          COMMENT="$(GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=./sample_config.json)"
+          gh pr create -B master -H twios --title "TWIOS $(date)" --body $COMMENT  
+    
+  edit_twios:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Execute for pull request comments only
+        if: github.event.issue.pull_request
+        run: echo "This is a pull request comment event"
