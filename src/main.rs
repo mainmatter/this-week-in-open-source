@@ -3,7 +3,6 @@ use serde;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::env;
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 
