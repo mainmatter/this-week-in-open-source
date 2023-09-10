@@ -1,0 +1,13 @@
+Using this-week-in-open-source v0.4.2
+
+is:pr author:BobrImperator created:2023-09-03..2023-09-10
+
+- TWIOS_PATH twios/
+
+- TWIOS_DATE 2023-09-03..2023-09-10
+
+- TWIOS_CATEGORIES "Rust,Ember,Ruby"
+
+- TWIOS_UNLABELLED
+
+  - [mainmatter/this-week-in-open-source] UNKNOWN
