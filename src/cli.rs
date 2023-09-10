@@ -26,6 +26,7 @@ pub struct Args {
     pub date_sign: String,
     pub config_path: String,
     pub context: String,
+    pub comment_body: String,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -63,6 +64,7 @@ pub struct AppParams {
     pub config_path: String,
     pub output_path: String,
     pub context: CLI_CONTEXT,
+    pub comment_body: String,
 }
 
 pub fn args() -> AppParams {
@@ -86,6 +88,7 @@ pub fn args() -> AppParams {
             config_path: args.config_path,
             output_path: file_config.output_path,
             context: cli_context,
+            comment_body: args.comment_body,
         },
         Err(error) => {
             if args.config_path.len() == 0 {
@@ -109,6 +112,7 @@ pub fn args() -> AppParams {
                 config_path: args.config_path,
                 output_path: "".to_string(),
                 context: cli_context,
+                comment_body: "".to_string(),
             }
         }
     }
@@ -139,13 +143,17 @@ fn process_args(pairs: Vec<Arg>) -> Args {
         date_sign: String::from(""),
         config_path: String::from(""),
         context: String::from(""),
+        comment_body: String::from(""),
     };
 
     for pair in pairs {
         match (pair.0.as_str(), pair.1.as_str()) {
             ("comment", _value) => {
                 args.context = "twios_comment".to_string();
-            }
+            },
+            ("--comment", value) => {
+                args.comment_body = value.to_string();
+            },
             ("--users", value) => {
                 args.users.append(
                     &mut value
@@ -222,17 +230,17 @@ TWIOS_UNLABELLED
 // - Add ability for this-week to omit before/after dates and use default range of a week
 // - Add ability to specify a per-post file path
 
-struct TwiosComment {
-    body: String,
+pub struct TwiosComment {
+   pub body: String,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Default, Debug)]
-struct TwiosCommentOutput {
-    labels: Vec<LabelConfig>,
-    excluded: Vec<String>,
-    date: String,
-    file_path: String,
+pub struct TwiosCommentOutput {
+   pub labels: Vec<LabelConfig>,
+   pub excluded: Vec<String>,
+   pub date: String,
+   pub file_path: String,
 }
 
 impl TwiosCommentOutput {
@@ -247,7 +255,7 @@ impl TwiosCommentOutput {
 }
 
 impl TwiosComment {
-    fn read(&self) -> TwiosCommentOutput {
+    pub fn read(&self) -> TwiosCommentOutput {
         let mut output = TwiosCommentOutput::new();
 
         // (TWIOS_\w+)((\s+-\s+\[.*\]\s+\w+)+|(?:\s+(.*)))
@@ -312,6 +320,7 @@ mod tests {
             date_sign: "".to_string(),
             config_path: "".to_string(),
             context: "".to_string(),
+            comment_body: String::from(""),
         };
 
         assert_eq!(expected, process_args(vec![]));
@@ -325,6 +334,7 @@ mod tests {
             date_sign: "".to_string(),
             config_path: "".to_string(),
             context: "".to_string(),
+            comment_body: String::from(""),
         };
 
         assert_eq!(
@@ -344,6 +354,7 @@ mod tests {
             date_sign: "".to_string(),
             config_path: "".to_string(),
             context: "".to_string(),
+            comment_body: String::from(""),
         };
 
         assert_eq!(
@@ -363,6 +374,7 @@ mod tests {
             date_sign: "".to_string(),
             config_path: "".to_string(),
             context: "".to_string(),
+            comment_body: String::from(""),
         };
 
         assert_eq!(
@@ -379,6 +391,7 @@ mod tests {
             date_sign: ">".to_string(),
             config_path: "".to_string(),
             context: "".to_string(),
+            comment_body: String::from(""),
         };
 
         assert_eq!(
@@ -395,6 +408,7 @@ mod tests {
             date_sign: "<".to_string(),
             config_path: "".to_string(),
             context: "".to_string(),
+            comment_body: String::from(""),
         };
 
         assert_eq!(
@@ -411,6 +425,7 @@ mod tests {
             date_sign: "".to_string(),
             config_path: "../config/location.json".to_string(),
             context: "".to_string(),
+            comment_body: String::from(""),
         };
 
         assert_eq!(
@@ -435,7 +450,8 @@ mod tests {
                 date: "".to_string(),
                 date_sign: "".to_string(),
                 output_path: "".to_string(),
-                context: CLI_CONTEXT::TWIOS
+                context: CLI_CONTEXT::TWIOS,
+                comment_body: "".to_string(),
             },
             args()
         );

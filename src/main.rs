@@ -313,7 +313,15 @@ async fn main() -> octocrab::Result<()> {
         cli::CLI_CONTEXT::COMMENT => {
             let mut comment_content: Vec<String> = vec![];
             write_twios_comment_contents(&mut comment_content, &app_params, &labels, &unknown_items);
-     
+            let twios_comment = cli::TwiosComment {
+                body: app_params.comment_body.clone()
+            };
+
+            let output = twios_comment.read();
+
+
+            // modify file
+
             io::stdout().flush().unwrap();
             io::stdout().write_all(comment_content.join("\n").as_bytes()).unwrap();
         }
