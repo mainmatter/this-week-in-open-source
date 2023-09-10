@@ -34,7 +34,7 @@ jobs:
           mkdir -p twios/
           git add . && git commit -m "$BRANCH_NAME"
           git checkout -b $BRANCH_NAME
-          git push
+          git push --set-upstream origin $BRANCH_NAME
           gh pr create --base origin/main --head origin/$BRANCH_NAME --title "TWIOS $FORMATTED_DATE" --body-file comment.txt
     
   edit_twios:
