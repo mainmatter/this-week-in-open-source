@@ -24,8 +24,7 @@ jobs:
         run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --users=BobrImperator --config-path=./sample_config.json
       - name: Generate Comment
         run: |
-          COMMENT="$(GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=./sample_config.json)"
-          echo -e $COMMENT > comment.txt
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=./sample_config.json > comment.txt
       - name: Create TWIOS on schedule
         if: github.event.schedule || github.event.pull_request
         run: |
