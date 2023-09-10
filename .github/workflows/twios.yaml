@@ -7,7 +7,6 @@ on:
     # Every Sunday 23:00
     - cron: '0 23 * * 0'
   issue_comment:
-    types: [edited]
   pull_request:
 
 jobs:
