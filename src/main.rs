@@ -131,7 +131,7 @@ async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item
 }
 
 async fn set_item_merge_status(octocrab: &Octocrab, items: &mut Vec<Item>) -> () {
-    for mut item in items {
+    for item in items {
         match octocrab
             .pulls(item.organization_name.clone(), item.repository_name.clone())
             .is_merged(item.issue_number.parse::<u64>().unwrap())
@@ -298,19 +298,19 @@ async fn main() -> octocrab::Result<()> {
     let (labels, unknown_items) = match_items_with_labels(&mut labelled_items, &items);
 
     match app_params.context {
-        cli::CLI_CONTEXT::TWIOS => {
+        cli::CliContext::TWIOS => {
             let mut file_content: Vec<String> = vec![];
             write_twios_file_contents(&mut file_content, &labels, &unknown_items);
 
-            file.write_all(app_params.header.join("\n").as_bytes());
-            file.write_all(file_content.join("\n").as_bytes());
-            file.write(BREAK_LINE.as_bytes());
-            file.write_all(markdown_definitions.join("\n").as_bytes());
+            file.write_all(app_params.header.join("\n").as_bytes()).unwrap();
+            file.write_all(file_content.join("\n").as_bytes()).unwrap();
+            file.write(BREAK_LINE.as_bytes()).unwrap();
+            file.write_all(markdown_definitions.join("\n").as_bytes()).unwrap();
     println!("");
     println!("Done! :)");
 
         },
-        cli::CLI_CONTEXT::COMMENT => {
+        cli::CliContext::COMMENT => {
             let mut comment_content: Vec<String> = vec![];
             write_twios_comment_contents(&mut comment_content, &app_params, &labels, &unknown_items);
             let twios_comment = cli::TwiosComment {
@@ -319,6 +319,7 @@ async fn main() -> octocrab::Result<()> {
 
             let output = twios_comment.read();
 
+            format!("{:?}", output);
 
             // modify file
             io::stdout().write_all(comment_content.join("\n").as_bytes()).unwrap();

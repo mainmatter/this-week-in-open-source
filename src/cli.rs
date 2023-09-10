@@ -1,4 +1,4 @@
-use chrono::{Datelike, Days, NaiveDate, NaiveWeek, Weekday};
+use chrono::Days;
 use regex::Regex;
 use serde;
 use serde::Deserialize;
@@ -7,10 +7,10 @@ use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::{env, time::Duration};
+use std::env;
 
 #[derive(PartialEq, Debug)]
-pub enum CLI_CONTEXT {
+pub enum CliContext {
     TWIOS,
     COMMENT,
 }
@@ -63,7 +63,7 @@ pub struct AppParams {
     pub date_sign: String,
     pub config_path: String,
     pub output_path: String,
-    pub context: CLI_CONTEXT,
+    pub context: CliContext,
     pub comment_body: String,
 }
 
@@ -71,9 +71,9 @@ pub fn args() -> AppParams {
     let args = process_args(read_args());
 
     let cli_context = if args.context == "twios_comment" {
-        CLI_CONTEXT::COMMENT
+        CliContext::COMMENT
     } else {
-        CLI_CONTEXT::TWIOS
+        CliContext::TWIOS
     };
 
     match read_config_from_file(args.config_path.clone()) {
@@ -450,7 +450,7 @@ mod tests {
                 date: "".to_string(),
                 date_sign: "".to_string(),
                 output_path: "".to_string(),
-                context: CLI_CONTEXT::TWIOS,
+                context: CliContext::TWIOS,
                 comment_body: "".to_string(),
             },
             args()
