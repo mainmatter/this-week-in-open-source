@@ -21,11 +21,10 @@ jobs:
           git config --global user.name "TWIOS Dev"
       - name: Generate Comment
         run: |
-          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment -config-path=sample_config.json > comment.txt
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --config-path=sample_config.json > comment.txt
       - name: Generate TWIOS
         run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --config-path=sample_config.json
       - name: Create TWIOS on schedule
-        if: github.event.schedule || github.event.pull_request
         run: |
           FORMATTED_DATE="$(date +"%Y-%m-%d")"
           BRANCH_NAME="twios-$FORMATTED_DATE"
@@ -55,7 +54,6 @@ jobs:
       - name: Generate TWIOS
         run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --config-path=sample_config.json
       - name: Create TWIOS on schedule
-        if: github.event.schedule || github.event.pull_request
         run: |
           FORMATTED_DATE="$(date +"%Y-%m-%d")"
           BRANCH_NAME="twios-$FORMATTED_DATE"
