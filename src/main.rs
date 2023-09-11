@@ -272,7 +272,7 @@ async fn main() -> octocrab::Result<()> {
 
     let octocrab = initialize_octocrab().await?;
 
-    let app_params = args();
+    let (app_params, file_config) = args();
 
     let mut items = get_user_items(&octocrab, &app_params).await;
     items = items
@@ -323,11 +323,9 @@ async fn main() -> octocrab::Result<()> {
                 body: app_params.comment_body.clone()
             };
 
-            let output = twios_comment.read();
+            let mut output = twios_comment.read();
 
-            format!("{:?}", output);
-
-            // modify file
+            cli::write_config_to_file(app_params.config_path.clone(), &cli::merge_with_file_config(&mut output, file_config.unwrap())).unwrap();
             io::stdout().write_all(comment_content.join("\n").as_bytes()).unwrap();
         }
     }

@@ -2,12 +2,13 @@ use chrono::Days;
 use regex::Regex;
 use serde;
 use serde::Deserialize;
+use serde::Serialize;
 use serde_json;
+use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::env;
 
 #[derive(PartialEq, Debug)]
 pub enum CliContext {
@@ -30,14 +31,15 @@ pub struct Args {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LabelConfig {
     pub name: String,
     pub repos: Vec<String>,
 }
 
-#[derive(Deserialize, Debug)]
-struct FileConfig {
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FileConfig {
     labels: Vec<LabelConfig>,
     #[serde(default)]
     header: Vec<String>,
@@ -67,7 +69,7 @@ pub struct AppParams {
     pub comment_body: String,
 }
 
-pub fn args() -> AppParams {
+pub fn args() -> (AppParams, Option<FileConfig>){
     let args = process_args(read_args());
 
     let cli_context = if args.context == "twios_comment" {
@@ -77,19 +79,19 @@ pub fn args() -> AppParams {
     };
 
     match read_config_from_file(args.config_path.clone()) {
-        Ok(file_config) => AppParams {
-            labels: file_config.labels,
-            header: file_config.header,
-            exclude: file_config.exclude,
-            users: file_config.users,
+        Ok(file_config) => (AppParams {
+            labels: file_config.labels.clone(),
+            header: file_config.header.clone(),
+            exclude: file_config.exclude.clone(),
+            users: file_config.users.clone(),
             exclude_closed_not_merged: file_config.exclude_closed_not_merged,
             date: args.date,
             date_sign: args.date_sign,
             config_path: args.config_path,
-            output_path: file_config.output_path,
+            output_path: file_config.output_path.clone(),
             context: cli_context,
             comment_body: args.comment_body,
-        },
+        }, Some(file_config)),
         Err(error) => {
             if args.config_path.len() == 0 {
                 println!("--config-path is not provided.");
@@ -101,7 +103,7 @@ pub fn args() -> AppParams {
                 println!("{:?}", error);
             }
 
-            AppParams {
+            (AppParams {
                 labels: vec![],
                 header: vec![],
                 exclude: vec![],
@@ -113,7 +115,7 @@ pub fn args() -> AppParams {
                 output_path: "".to_string(),
                 context: cli_context,
                 comment_body: "".to_string(),
-            }
+            }, None)
         }
     }
 }
@@ -150,10 +152,10 @@ fn process_args(pairs: Vec<Arg>) -> Args {
         match (pair.0.as_str(), pair.1.as_str()) {
             ("comment", _value) => {
                 args.context = "twios_comment".to_string();
-            },
+            }
             ("--comment", value) => {
                 args.comment_body = value.to_string();
-            },
+            }
             ("--users", value) => {
                 args.users.append(
                     &mut value
@@ -197,6 +199,14 @@ fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn 
     Ok(config)
 }
 
+pub fn write_config_to_file<P: AsRef<Path>>(path: P, file_config: &FileConfig) -> Result<(), Box<dyn Error>> {
+    let file = File::create(path)?;
+
+    serde_json::to_writer_pretty(&file, file_config)?;
+
+    Ok(())
+}
+
 // PR_COMMENT_BODY
 // on:
 //  issue_comment:
@@ -231,16 +241,16 @@ TWIOS_UNLABELLED
 // - Add ability to specify a per-post file path
 
 pub struct TwiosComment {
-   pub body: String,
+    pub body: String,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Default, Debug)]
 pub struct TwiosCommentOutput {
-   pub labels: Vec<LabelConfig>,
-   pub excluded: Vec<String>,
-   pub date: String,
-   pub file_path: String,
+    pub labels: Vec<LabelConfig>,
+    pub excluded: Vec<String>,
+    pub date: String,
+    pub file_path: String,
 }
 
 impl TwiosCommentOutput {
@@ -252,6 +262,31 @@ impl TwiosCommentOutput {
             file_path: "".to_string(),
         }
     }
+}
+
+pub fn merge_with_file_config(
+    comment_output: &mut TwiosCommentOutput,
+    file_config: FileConfig,
+) -> FileConfig {
+    let mut new_config = file_config.clone();
+
+    for label in comment_output.labels.iter_mut() {
+        let in_file = new_config
+            .labels
+            .iter_mut()
+            .find(|flabel| flabel.name == label.name);
+
+        match in_file {
+            Some(config) => {
+                config.repos.append(&mut label.repos);
+            }
+            None => new_config.labels.push(label.clone()),
+        }
+    }
+
+    new_config.exclude.append(&mut comment_output.excluded);
+
+    new_config
 }
 
 impl TwiosComment {
@@ -310,6 +345,8 @@ impl TwiosComment {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
 
     #[test]
@@ -440,7 +477,8 @@ mod tests {
     #[test]
     fn it_returns_app_params_with_defaults() {
         assert_eq!(
-            AppParams {
+            
+            (AppParams {
                 exclude_closed_not_merged: false,
                 labels: vec![],
                 header: vec![],
@@ -452,7 +490,7 @@ mod tests {
                 output_path: "".to_string(),
                 context: CliContext::TWIOS,
                 comment_body: "".to_string(),
-            },
+            }, None),
             args()
         );
     }
@@ -487,6 +525,50 @@ Available categories
                 }],
             },
             expected.read()
+        );
+    }
+
+    #[test]
+    fn it_merges_with_file_config() {
+        let expected = TwiosComment {
+            body: r#"
+Post's file path
+- TWIOS_PATH /twios/ 
+Post's date
+- TWIOS_DATE >2021-11-28 
+Available categories
+- TWIOS_CATEGORIES Ember,Javascript,Typescript
+- TWIOS_UNLABELLED 
+ - [EmbarkStudios/spdx] UNKNOWN 
+ - [mainmatter/ember-simple-auth] Ember  
+ - [simplabs/ember-error-route] EXCLUDED
+- Doesn't catch this
+            "#
+            .to_string(),
+        };
+
+        let file_config = FileConfig {
+            exclude_closed_not_merged: false,
+            header: vec![],
+            output_path: "".to_string(),
+            exclude: vec![],
+            users: vec![],
+            labels: vec![],
+        };
+
+        assert_eq!(
+            FileConfig {
+                exclude_closed_not_merged: false,
+                header: vec![],
+                output_path: "".to_string(),
+                exclude: vec!["simplabs/ember-error-route".to_string()],
+                users: vec![],
+                labels: vec![LabelConfig {
+                    name: "Ember".to_string(),
+                    repos: vec!["mainmatter/ember-simple-auth".to_string()]
+                }]
+            },
+            merge_with_file_config(&mut expected.read(), file_config)
         );
     }
 }
