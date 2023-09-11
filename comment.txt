@@ -9,5 +9,3 @@ is:pr author:BobrImperator created:2023-09-04..2023-09-11
 - TWIOS_CATEGORIES "Rust,Ember,Ruby"
 
 - TWIOS_UNLABELLED
-
-  - [mainmatter/this-week-in-open-source] UNKNOWN

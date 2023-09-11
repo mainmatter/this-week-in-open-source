@@ -4,7 +4,8 @@
       "name": "Rust",
       "repos": [
         "rust-lang/crates.io",
-        "Turbo87/aprs-parser-rs"
+        "Turbo87/aprs-parser-rs",
+        "mainmatter/this-week-in-open-source"
       ]
     },
     {
