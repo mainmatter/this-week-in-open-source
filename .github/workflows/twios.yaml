@@ -6,7 +6,6 @@ on:
   schedule:
     # Every Sunday 23:00
     - cron: '0 23 * * 0'
-  pull_request:
   label:
     types: [labeled, unlabeled]
 
@@ -39,11 +38,11 @@ jobs:
     
   edit_twios:
     runs-on: ubuntu-latest
+    if: github.event.pull_request.body
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Read PR commetn body
-        if: github.event.pull_request
         run: | 
           GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=sample_config.json --comment=${{ github.event.pull_request.body }}
       - name: Generate Comment
