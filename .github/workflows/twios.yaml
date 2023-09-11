@@ -6,8 +6,9 @@ on:
   schedule:
     # Every Sunday 23:00
     - cron: '0 23 * * 0'
-  issue_comment:
   pull_request:
+  label:
+    types: [labeled, unlabeled]
 
 jobs:
   create_twios:
@@ -19,11 +20,11 @@ jobs:
         run: |
           git config --global user.email "twios@twios_test_dev.com"
           git config --global user.name "TWIOS Dev"
-      - name: Generate TWIOS
-        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --users=BobrImperator --config-path=./sample_config.json
       - name: Generate Comment
         run: |
-          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=./sample_config.json > comment.txt
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=sample_config.json > comment.txt
+      - name: Generate TWIOS
+        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --users=BobrImperator --config-path=sample_config.json
       - name: Create TWIOS on schedule
         if: github.event.schedule || github.event.pull_request
         run: |
@@ -41,6 +42,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Execute for pull request comments only
-        if: github.event.issue.pull_request
-        run: echo "This is a pull request comment event"
+      - name: Read PR commetn body
+        if: github.event.pull_request
+        run: | 
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=sample_config.json --comment=${{ github.event.pull_request.body }}
+      - name: Generate Comment
+        run: |
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=sample_config.json > comment.txt
+      - name: Generate TWIOS
+        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --users=BobrImperator --config-path=sample_config.json
+      - name: Create TWIOS on schedule
+        if: github.event.schedule || github.event.pull_request
+        run: |
+          FORMATTED_DATE="$(date +"%Y-%m-%d")"
+          BRANCH_NAME="twios-$FORMATTED_DATE"
+          mkdir -p twios/
+          git fetch
+          git add . && git commit -m "$BRANCH_NAME"
+          git checkout -b $BRANCH_NAME
+          git push --set-upstream origin $BRANCH_NAME
+          gh pr create --base main --head $BRANCH_NAME --title "TWIOS $FORMATTED_DATE" --body-file comment.txt
