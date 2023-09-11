@@ -21,9 +21,9 @@ jobs:
           git config --global user.name "TWIOS Dev"
       - name: Generate Comment
         run: |
-          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=sample_config.json > comment.txt
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment -config-path=sample_config.json > comment.txt
       - name: Generate TWIOS
-        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --users=BobrImperator --config-path=sample_config.json
+        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --config-path=sample_config.json
       - name: Create TWIOS on schedule
         if: github.event.schedule || github.event.pull_request
         run: |
@@ -48,12 +48,12 @@ jobs:
           git config --global user.name "TWIOS Dev"
       - name: Read PR commetn body
         run: | 
-          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=sample_config.json --comment=${{ github.event.pull_request.body }}
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --config-path=sample_config.json --comment=${{ github.event.pull_request.body }}
       - name: Generate Comment
         run: |
-          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --users=BobrImperator --config-path=sample_config.json > comment.txt
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --config-path=sample_config.json > comment.txt
       - name: Generate TWIOS
-        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --users=BobrImperator --config-path=sample_config.json
+        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --config-path=sample_config.json
       - name: Create TWIOS on schedule
         if: github.event.schedule || github.event.pull_request
         run: |
