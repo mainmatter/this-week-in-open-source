@@ -6,6 +6,6 @@ is:pr author:BobrImperator created:2023-09-04..2023-09-11
 
 - TWIOS_DATE 2023-09-04..2023-09-11
 
-- TWIOS_CATEGORIES "Rust,Ember,Ruby"
+- TWIOS_CATEGORIES "Rust,Ember,Ruby,TWIOS"
 
 - TWIOS_UNLABELLED
