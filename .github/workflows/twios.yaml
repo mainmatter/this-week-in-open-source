@@ -12,6 +12,7 @@ on:
 jobs:
   create_twios:
     runs-on: ubuntu-latest
+    if: ${{!github.event.pull_request.body}}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -47,7 +48,7 @@ jobs:
           git config --global user.name "TWIOS Dev"
       - name: Read PR commetn body
         run: | 
-          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --config-path=sample_config.json --comment=${{ github.event.pull_request.body }}
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --config-path=sample_config.json --comment="${{ github.event.pull_request.body }}"
       - name: Generate Comment
         run: |
           GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --config-path=sample_config.json > comment.txt
