@@ -58,9 +58,8 @@ jobs:
         run: |
           FORMATTED_DATE="$(date +"%Y-%m-%d")"
           BRANCH_NAME="twios-$FORMATTED_DATE"
-          mkdir -p twios/
           git fetch
-          git add . && git commit -m "$BRANCH_NAME"
-          git checkout -b $BRANCH_NAME
-          git push --set-upstream origin $BRANCH_NAME
-          gh pr create --base main --head $BRANCH_NAME --title "TWIOS $FORMATTED_DATE" --body-file comment.txt
+          git checkout $BRANCH_NAME
+          git pull
+          git add . && git commit -m "Edited $BRANCH_NAME"
+          git push
