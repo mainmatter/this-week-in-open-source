@@ -52,13 +52,6 @@ async fn get_prs(
     date_sign: &String,
     date: &String,
 ) -> octocrab::Result<octocrab::Page<models::issues::Issue>, octocrab::Error> {
-    println!(
-            "is:pr author:{} created:{}{}",
-            user.as_str(),
-            date_sign.as_str(),
-            date.as_str(),
-        );
-
     octocrab
         .search()
         .issues_and_pull_requests(&format!(
