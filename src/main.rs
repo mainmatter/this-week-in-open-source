@@ -242,15 +242,11 @@ fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParam
     content.push(String::from(""));
 
     content.push(format!("- TWIOS_PATH {}", app_params.output_path));
-    content.push(String::from(""));
     content.push(format!("- TWIOS_DATE {}", app_params.date));
-    content.push(String::from(""));
     content.push(format!("- TWIOS_CATEGORIES {:?}", labels.into_iter().map(|item| item.name.clone()).collect::<Vec<_>>().join(",")));
-    content.push(String::from(""));
     content.push("- TWIOS_UNLABELLED".to_string());
 
     for item in unknown_items.iter() {
-        content.push(String::from(""));
         content.push(format!(
         "  - [{}] UNKNOWN",
         item.full_repository_name
@@ -305,8 +301,8 @@ async fn main() -> octocrab::Result<()> {
             file.write_all(file_content.join("\n").as_bytes()).unwrap();
             file.write(BREAK_LINE.as_bytes()).unwrap();
             file.write_all(markdown_definitions.join("\n").as_bytes()).unwrap();
-    println!("");
-    println!("Done! :)");
+            println!("");
+            println!("Done! :)");
 
         },
         cli::CliContext::COMMENT => {
