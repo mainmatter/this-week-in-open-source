@@ -55,7 +55,7 @@ jobs:
         run: |
           FORMATTED_DATE="$(date +"%Y-%m-%d")"
           BRANCH_NAME="twios-$FORMATTED_DATE"
-          git fetch origin $TWIOS_BRANCH
+          git fetch origin $BRANCH_NAME
           git checkout $BRANCH_NAME
           git pull
           git add *.md && git commit -m "Edited $BRANCH_NAME"
