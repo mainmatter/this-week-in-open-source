@@ -248,10 +248,13 @@ fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParam
 
     for item in unknown_items.iter() {
         content.push(format!(
-        "  - [{}] UNKNOWN",
-        item.full_repository_name
+        "  - [{}] UNKNOWN @{}",
+        item.full_repository_name,
+        item.user_login
     ));
     }
+
+    content.push("Change repo category to EXCLUDED in order to permantently ignore it from TWIOS from now on.".to_string());
 }
 
 #[tokio::main]
