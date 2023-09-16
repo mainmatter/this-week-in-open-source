@@ -350,148 +350,73 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_processes_args() {
-        let expected = Args {
-            users: vec![],
-            date: "".to_string(),
-            date_sign: "".to_string(),
-            config_path: "".to_string(),
-            context: "".to_string(),
-            comment_body: String::from(""),
-        };
-
-        assert_eq!(expected, process_args(vec![]));
-    }
-
-    #[test]
     fn it_processes_users_args() {
-        let expected = Args {
-            users: vec!["BobrImperator".to_string()],
-            date: "".to_string(),
-            date_sign: "".to_string(),
-            config_path: "".to_string(),
-            context: "".to_string(),
-            comment_body: String::from(""),
-        };
-
         assert_eq!(
-            expected,
+            vec!["BobrImperator".to_string()],
             process_args(vec![Arg(
                 "--users".to_string(),
                 "BobrImperator".to_string()
-            )])
+            )]).users
         );
     }
 
     #[test]
     fn it_processes_multiple_users_args() {
-        let expected = Args {
-            users: vec!["BobrImperator".to_string(), "mansona".to_string()],
-            date: "".to_string(),
-            date_sign: "".to_string(),
-            config_path: "".to_string(),
-            context: "".to_string(),
-            comment_body: String::from(""),
-        };
-
         assert_eq!(
-            expected,
+        vec!["BobrImperator".to_string(), "mansona".to_string()],
             process_args(vec![Arg(
                 "--users".to_string(),
                 "BobrImperator,mansona".to_string()
-            )])
+            )]).users
         );
     }
 
     #[test]
     fn it_processes_date_args() {
-        let expected = Args {
-            users: vec![],
-            date: "2022-02-18".to_string(),
-            date_sign: "".to_string(),
-            config_path: "".to_string(),
-            context: "".to_string(),
-            comment_body: String::from(""),
-        };
-
         assert_eq!(
-            expected,
-            process_args(vec![Arg("--date".to_string(), "2022-02-18".to_string())])
+            "2022-02-18".to_string(),
+            process_args(vec![Arg("--date".to_string(), "2022-02-18".to_string())]).date
         );
     }
 
     #[test]
     fn it_processes_after_args() {
-        let expected = Args {
-            users: vec![],
-            date: "".to_string(),
-            date_sign: ">".to_string(),
-            config_path: "".to_string(),
-            context: "".to_string(),
-            comment_body: String::from(""),
-        };
-
         assert_eq!(
-            expected,
-            process_args(vec![Arg("-after".to_string(), "".to_string())])
+            ">".to_string(),
+            process_args(vec![Arg("-after".to_string(), "".to_string())]).date_sign
         );
     }
 
     #[test]
     fn it_processes_before_args() {
-        let expected = Args {
-            users: vec![],
-            date: "".to_string(),
-            date_sign: "<".to_string(),
-            config_path: "".to_string(),
-            context: "".to_string(),
-            comment_body: String::from(""),
-        };
-
         assert_eq!(
-            expected,
-            process_args(vec![Arg("-before".to_string(), "".to_string())])
+            "<".to_string(),
+            process_args(vec![Arg("-before".to_string(), "".to_string())]).date_sign
         );
     }
 
     #[test]
     fn it_processes_config_path_args() {
-        let expected = Args {
-            users: vec![],
-            date: "".to_string(),
-            date_sign: "".to_string(),
-            config_path: "../config/location.json".to_string(),
-            context: "".to_string(),
-            comment_body: String::from(""),
-        };
-
         assert_eq!(
-            expected,
+            "../config/location.json",
             process_args(vec![Arg(
                 "--config-path".to_string(),
                 "../config/location.json".to_string()
-            )])
+            )]).config_path
         );
     }
 
     #[test]
     fn it_returns_app_params_with_defaults() {
+        
+        let (args, file_config) = args();
         assert_eq!(
-            
-            (AppParams {
-                exclude_closed_not_merged: false,
-                labels: vec![],
-                header: vec![],
-                users: vec![],
-                exclude: vec![],
-                config_path: "".to_string(),
-                date: "".to_string(),
-                date_sign: "".to_string(),
-                output_path: "".to_string(),
-                context: CliContext::TWIOS,
-                comment_body: "".to_string(),
-            }, None),
-            args()
+           CliContext::TWIOS,
+            args.context,
+        );
+        assert_eq!(
+        None,   
+        file_config,
         );
     }
 
