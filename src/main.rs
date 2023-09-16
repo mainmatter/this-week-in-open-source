@@ -254,7 +254,8 @@ fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParam
     ));
     }
 
-    content.push("Change repo category to EXCLUDED in order to permantently ignore it from TWIOS from now on.".to_string());
+    content.push("".to_string());
+    content.push("Change repo category to `EXCLUDED` in order to permantently ignore it from TWIOS from now on.".to_string());
 }
 
 #[tokio::main]
