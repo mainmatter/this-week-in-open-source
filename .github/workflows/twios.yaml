@@ -33,7 +33,7 @@ jobs:
           BRANCH_NAME="twios-$FORMATTED_DATE"
           git fetch origin $TWIOS_BRANCH
           git checkout -b $BRANCH_NAME
-          git add *.md && git commit -m "$BRANCH_NAME"
+          git add *.md *.json && git commit -m "$BRANCH_NAME"
           git push --set-upstream origin $BRANCH_NAME
           gh pr create --base main --head $BRANCH_NAME --title "TWIOS $FORMATTED_DATE" --body-file comment.txt
     
@@ -57,5 +57,5 @@ jobs:
           git fetch origin $TWIOS_PR_REF
           git checkout $TWIOS_PR_REF
           git pull
-          git add *.md && git commit -m "Edited $TWIOS_PR_REF"
+          git add *.md *.json && git commit -m "Edited $TWIOS_PR_REF"
           git push
