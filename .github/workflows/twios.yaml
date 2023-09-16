@@ -8,7 +8,7 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  TWIOS_BRANCH: "master"
+  TWIOS_BRANCH: "main"
 
 jobs:
   create_twios:
