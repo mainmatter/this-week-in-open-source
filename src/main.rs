@@ -246,12 +246,17 @@ fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParam
     content.push(format!("- TWIOS_CATEGORIES {:?}", labels.into_iter().map(|item| item.name.clone()).collect::<Vec<_>>().join(",")));
     content.push("- TWIOS_UNLABELLED".to_string());
 
+    let mut unknown_labels = HashSet::new();
     for item in unknown_items.iter() {
-        content.push(format!(
+        let label = format!(
         "  - [{}] UNKNOWN @{}",
         item.full_repository_name,
         item.user_login
-    ));
+    );
+        if !unknown_labels.contains(&label) {
+            unknown_labels.insert(label.clone());
+        }
+        content.push(label);
     }
 
     content.push("".to_string());
