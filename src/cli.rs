@@ -295,7 +295,7 @@ impl TwiosComment {
 
         // (TWIOS_\w+)((\s+-\s+\[.*\]\s+\w+)+|(?:\s+(.*)))
         // (TWIOS_\w+)(((?ms)\s+-\s+\[.*\]\s+\w+)*|(?:\s+(.*)))
-        let re = Regex::new(r"(TWIOS_\w+)((\s+-\s+\[.*\]\s+\w+)+|(?:\s+(.*)))").unwrap();
+        let re = Regex::new(r"(TWIOS_\w+)((\s+-\s+\[.*\]\s+\w*.*)+|(?:\s+(.*)))").unwrap();
 
         for capture in re.captures_iter(&self.body) {
             let keyword = &capture[1];
@@ -506,9 +506,9 @@ Post's date
 Available categories
 - TWIOS_CATEGORIES Ember,Javascript,Typescript
 - TWIOS_UNLABELLED 
- - [EmbarkStudios/spdx] UNKNOWN 
- - [mainmatter/ember-simple-auth] Ember  
- - [simplabs/ember-error-route] EXCLUDED
+ - [EmbarkStudios/spdx] UNKNOWN @SomeOne
+ - [mainmatter/ember-simple-auth] Ember @SomeTwo  
+ - [simplabs/ember-error-route] EXCLUDED @SomeThree
 - Doesn't catch this
             "#
             .to_string(),
@@ -539,9 +539,9 @@ Post's date
 Available categories
 - TWIOS_CATEGORIES Ember,Javascript,Typescript
 - TWIOS_UNLABELLED 
- - [EmbarkStudios/spdx] UNKNOWN 
- - [mainmatter/ember-simple-auth] Ember  
- - [simplabs/ember-error-route] EXCLUDED
+ - [EmbarkStudios/spdx] UNKNOWN @SomeOne
+ - [mainmatter/ember-simple-auth] Ember @SomeTwo  
+ - [simplabs/ember-error-route] EXCLUDED @SomeThree
 - Doesn't catch this
             "#
             .to_string(),
