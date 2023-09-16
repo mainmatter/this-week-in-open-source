@@ -1,7 +1,8 @@
 {
+  "output_path": "twios/",
   "exclude_closed_not_merged": true,
   "users": [
-    "Turbo87"
+    "BobrImperator"
   ],
   "labels": [
     {
