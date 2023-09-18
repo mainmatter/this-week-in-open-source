@@ -69,7 +69,21 @@ pub struct AppParams {
     pub comment_body: String,
 }
 
-pub fn args() -> (AppParams, Option<FileConfig>){
+impl AppParams {
+    pub fn file_name(&self) -> String {
+        let mut file_name = self.date.as_ref();
+        let date_range = self.date.split("..").collect::<Vec<_>>();
+
+        match date_range.get(1) {
+            Some(&date) => file_name = date,
+            None => (),
+        }
+
+        format!("{}{}.md", self.output_path, file_name)
+    }
+}
+
+pub fn args() -> (AppParams, Option<FileConfig>) {
     let args = process_args(read_args());
 
     let cli_context = if args.context == "twios_comment" {
@@ -79,19 +93,22 @@ pub fn args() -> (AppParams, Option<FileConfig>){
     };
 
     match read_config_from_file(args.config_path.clone()) {
-        Ok(file_config) => (AppParams {
-            labels: file_config.labels.clone(),
-            header: file_config.header.clone(),
-            exclude: file_config.exclude.clone(),
-            users: file_config.users.clone(),
-            exclude_closed_not_merged: file_config.exclude_closed_not_merged,
-            date: args.date,
-            date_sign: args.date_sign,
-            config_path: args.config_path,
-            output_path: file_config.output_path.clone(),
-            context: cli_context,
-            comment_body: args.comment_body,
-        }, Some(file_config)),
+        Ok(file_config) => (
+            AppParams {
+                labels: file_config.labels.clone(),
+                header: file_config.header.clone(),
+                exclude: file_config.exclude.clone(),
+                users: file_config.users.clone(),
+                exclude_closed_not_merged: file_config.exclude_closed_not_merged,
+                date: args.date,
+                date_sign: args.date_sign,
+                config_path: args.config_path,
+                output_path: file_config.output_path.clone(),
+                context: cli_context,
+                comment_body: args.comment_body,
+            },
+            Some(file_config),
+        ),
         Err(error) => {
             if args.config_path.len() == 0 {
                 println!("--config-path is not provided.");
@@ -103,19 +120,22 @@ pub fn args() -> (AppParams, Option<FileConfig>){
                 println!("{:?}", error);
             }
 
-            (AppParams {
-                labels: vec![],
-                header: vec![],
-                exclude: vec![],
-                exclude_closed_not_merged: false,
-                users: args.users,
-                date: args.date,
-                date_sign: args.date_sign,
-                config_path: args.config_path,
-                output_path: "".to_string(),
-                context: cli_context,
-                comment_body: "".to_string(),
-            }, None)
+            (
+                AppParams {
+                    labels: vec![],
+                    header: vec![],
+                    exclude: vec![],
+                    exclude_closed_not_merged: false,
+                    users: args.users,
+                    date: args.date,
+                    date_sign: args.date_sign,
+                    config_path: args.config_path,
+                    output_path: "".to_string(),
+                    context: cli_context,
+                    comment_body: "".to_string(),
+                },
+                None,
+            )
         }
     }
 }
@@ -199,7 +219,10 @@ fn read_config_from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn 
     Ok(config)
 }
 
-pub fn write_config_to_file<P: AsRef<Path>>(path: P, file_config: &FileConfig) -> Result<(), Box<dyn Error>> {
+pub fn write_config_to_file<P: AsRef<Path>>(
+    path: P,
+    file_config: &FileConfig,
+) -> Result<(), Box<dyn Error>> {
     let file = File::create(path)?;
 
     serde_json::to_writer_pretty(&file, file_config)?;
@@ -356,18 +379,20 @@ mod tests {
             process_args(vec![Arg(
                 "--users".to_string(),
                 "BobrImperator".to_string()
-            )]).users
+            )])
+            .users
         );
     }
 
     #[test]
     fn it_processes_multiple_users_args() {
         assert_eq!(
-        vec!["BobrImperator".to_string(), "mansona".to_string()],
+            vec!["BobrImperator".to_string(), "mansona".to_string()],
             process_args(vec![Arg(
                 "--users".to_string(),
                 "BobrImperator,mansona".to_string()
-            )]).users
+            )])
+            .users
         );
     }
 
@@ -402,22 +427,70 @@ mod tests {
             process_args(vec![Arg(
                 "--config-path".to_string(),
                 "../config/location.json".to_string()
-            )]).config_path
+            )])
+            .config_path
         );
     }
 
     #[test]
     fn it_returns_app_params_with_defaults() {
-        
         let (args, file_config) = args();
-        assert_eq!(
-           CliContext::TWIOS,
-            args.context,
-        );
-        assert_eq!(
-        None,   
-        file_config,
-        );
+        assert_eq!(CliContext::TWIOS, args.context,);
+        assert_eq!(None, file_config,);
+    }
+
+    #[test]
+    fn it_returns_correct_file_name_given_just_date() {
+        let app_params = AppParams {
+            labels: vec![],
+            header: vec![],
+            exclude_closed_not_merged: false,
+            users: vec![],
+            date: "2022-06-30".to_string(),
+            config_path: "".to_string(),
+            context: CliContext::TWIOS,
+            comment_body: "".to_string(),
+            output_path: "".to_string(),
+            date_sign: "".to_string(),
+            exclude: vec![],
+        };
+        assert_eq!("2022-06-30.md", app_params.file_name());
+    }
+
+    #[test]
+    fn it_returns_correct_file_name_given_date_range() {
+        let app_params = AppParams {
+            labels: vec![],
+            header: vec![],
+            exclude_closed_not_merged: false,
+            users: vec![],
+            date: "2022-06-23..2022-06-30".to_string(),
+            config_path: "".to_string(),
+            context: CliContext::TWIOS,
+            comment_body: "".to_string(),
+            output_path: "".to_string(),
+            date_sign: "".to_string(),
+            exclude: vec![],
+        };
+        assert_eq!("2022-06-30.md", app_params.file_name());
+    }
+
+    #[test]
+    fn it_returns_correct_file_name_given_date_range_and_output_path() {
+        let app_params = AppParams {
+            labels: vec![],
+            header: vec![],
+            exclude_closed_not_merged: false,
+            users: vec![],
+            date: "2022-06-23..2022-06-30".to_string(),
+            config_path: "".to_string(),
+            context: CliContext::TWIOS,
+            comment_body: "".to_string(),
+            output_path: "src/twios/".to_string(),
+            date_sign: "".to_string(),
+            exclude: vec![],
+        };
+        assert_eq!("src/twios/2022-06-30.md", app_params.file_name());
     }
 
     #[test]

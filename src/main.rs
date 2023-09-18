@@ -284,11 +284,6 @@ async fn main() -> octocrab::Result<()> {
     items.sort_by_key(|item| item.full_repository_name.clone());
     let markdown_definitions = extract_definitions(&items);
 
-    let split_date = app_params.date.split("..").collect::<Vec<_>>();
-    let file_name = split_date[0];
-
-    let mut file = File::create(format!("{}.md", file_name)).unwrap();
-
     let mut labelled_items = app_params
         .labels
         .clone()
@@ -303,6 +298,7 @@ async fn main() -> octocrab::Result<()> {
 
     match app_params.context {
         cli::CliContext::TWIOS => {
+            let mut file = File::create(app_params.file_name()).unwrap();
             let mut file_content: Vec<String> = vec![];
             write_twios_file_contents(&mut file_content, &labels, &unknown_items);
 
