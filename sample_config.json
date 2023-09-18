@@ -1,9 +1,4 @@
 {
-  "output_path": "twios/",
-  "exclude_closed_not_merged": true,
-  "users": [
-    "BobrImperator"
-  ],
   "labels": [
     {
       "name": "Rust",
@@ -23,5 +18,14 @@
       "repos": []
     }
   ],
-  "exclude": ["Turbo87/aprs-parser-rs", "Turbo87/sentry-conduit"]
+  "header": [],
+  "users": [
+    "BobrImperator"
+  ],
+  "exclude": [
+    "Turbo87/aprs-parser-rs",
+    "Turbo87/sentry-conduit"
+  ],
+  "exclude_closed_not_merged": true,
+  "output_path": "twios/"
 }
