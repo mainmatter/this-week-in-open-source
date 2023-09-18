@@ -24,9 +24,9 @@ jobs:
           git config --global user.name "TWIOS Dev"
       - name: Generate Comment
         run: |
-          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN ./this-week-in-open-source comment --config-path=sample_config.json > comment.txt
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --config-path=sample_config.json > comment.txt
       - name: Generate TWIOS
-        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN ./this-week-in-open-source --config-path=sample_config.json
+        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --config-path=sample_config.json
       - name: Push new TWIOS
         run: |
           FORMATTED_DATE="$(date +"%Y-%m-%d")"
@@ -49,9 +49,9 @@ jobs:
           git config --global user.name "TWIOS Dev"
       - name: Read PR comment body
         run: | 
-          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN ./this-week-in-open-source comment --config-path=sample_config.json --comment="${{ github.event.pull_request.body }}"
+          GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --config-path=sample_config.json --comment="${{ github.event.pull_request.body }}"
       - name: Generate TWIOS
-        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN ./this-week-in-open-source --config-path=sample_config.json
+        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --config-path=sample_config.json -edit
       - name: Push updated TWIOS
         run: |
           git fetch origin $TWIOS_PR_REF

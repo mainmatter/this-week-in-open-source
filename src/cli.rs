@@ -28,6 +28,7 @@ pub struct Args {
     pub config_path: String,
     pub context: String,
     pub comment_body: String,
+    pub edit: bool,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -51,6 +52,8 @@ pub struct FileConfig {
     exclude_closed_not_merged: bool,
     #[serde(default)]
     output_path: String,
+    #[serde(default)]
+    last_date: String,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -92,23 +95,43 @@ pub fn args() -> (AppParams, Option<FileConfig>) {
         CliContext::TWIOS
     };
 
+    let now = chrono::offset::Utc::now();
+    let last_week = chrono::offset::Utc::now()
+        .checked_sub_days(Days::new(7))
+        .unwrap()
+        .naive_utc();
+    let default_date = format!(
+        "{}..{}",
+        last_week.format("%Y-%m-%d"),
+        now.format("%Y-%m-%d")
+    );
+
     match read_config_from_file(args.config_path.clone()) {
-        Ok(file_config) => (
-            AppParams {
-                labels: file_config.labels.clone(),
-                header: file_config.header.clone(),
-                exclude: file_config.exclude.clone(),
-                users: file_config.users.clone(),
-                exclude_closed_not_merged: file_config.exclude_closed_not_merged,
-                date: args.date,
-                date_sign: args.date_sign,
-                config_path: args.config_path,
-                output_path: file_config.output_path.clone(),
-                context: cli_context,
-                comment_body: args.comment_body,
-            },
-            Some(file_config),
-        ),
+        Ok(file_config) => {
+            let date = if args.date.len() > 0 {
+                args.date
+            } else if args.edit {
+                file_config.last_date.clone()
+            } else {
+                default_date
+            };
+            (
+                AppParams {
+                    labels: file_config.labels.clone(),
+                    header: file_config.header.clone(),
+                    exclude: file_config.exclude.clone(),
+                    users: file_config.users.clone(),
+                    exclude_closed_not_merged: file_config.exclude_closed_not_merged,
+                    date,
+                    date_sign: args.date_sign,
+                    config_path: args.config_path,
+                    output_path: file_config.output_path.clone(),
+                    context: cli_context,
+                    comment_body: args.comment_body,
+                },
+                Some(file_config),
+            )
+        }
         Err(error) => {
             if args.config_path.len() == 0 {
                 println!("--config-path is not provided.");
@@ -127,7 +150,11 @@ pub fn args() -> (AppParams, Option<FileConfig>) {
                     exclude: vec![],
                     exclude_closed_not_merged: false,
                     users: args.users,
-                    date: args.date,
+                    date: if args.date == "" {
+                        default_date
+                    } else {
+                        args.date
+                    },
                     date_sign: args.date_sign,
                     config_path: args.config_path,
                     output_path: "".to_string(),
@@ -166,6 +193,7 @@ fn process_args(pairs: Vec<Arg>) -> Args {
         config_path: String::from(""),
         context: String::from(""),
         comment_body: String::from(""),
+        edit: false,
     };
 
     for pair in pairs {
@@ -189,22 +217,10 @@ fn process_args(pairs: Vec<Arg>) -> Args {
             }
             ("-before", _) => args.date_sign = String::from("<"),
             ("-after", _) => args.date_sign = String::from(">"),
+            ("-edit", _) => args.edit = true,
             ("--config-path", value) => args.config_path = value.to_string(),
             (name, value) => println!("Could not handle argument {} with value {}", name, value),
         }
-    }
-
-    if args.date == "" {
-        let now = chrono::offset::Utc::now();
-        let last_week = chrono::offset::Utc::now()
-            .checked_sub_days(Days::new(7))
-            .unwrap()
-            .naive_utc();
-        args.date = format!(
-            "{}..{}",
-            last_week.format("%Y-%m-%d"),
-            now.format("%Y-%m-%d")
-        );
     }
 
     args
@@ -308,6 +324,7 @@ pub fn merge_with_file_config(
     }
 
     new_config.exclude.append(&mut comment_output.excluded);
+    new_config.last_date = comment_output.date.clone();
 
     new_config
 }
@@ -552,6 +569,7 @@ Available categories
             exclude: vec![],
             users: vec![],
             labels: vec![],
+            last_date: "".to_string(),
         };
 
         assert_eq!(
@@ -564,9 +582,10 @@ Available categories
                 labels: vec![LabelConfig {
                     name: "Ember".to_string(),
                     repos: vec!["mainmatter/ember-simple-auth".to_string()]
-                }]
+                }],
+                last_date: ">2021-11-28".to_string(),
             },
-            merge_with_file_config(&mut expected.read(), file_config)
+            merge_with_file_config(&mut expected.read(), file_config),
         );
     }
 }
