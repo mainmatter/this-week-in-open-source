@@ -51,7 +51,7 @@ jobs:
         run: | 
           GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- comment --config-path=sample_config.json --comment="${{ github.event.pull_request.body }}"
       - name: Generate TWIOS
-        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --config-path=sample_config.json
+        run: GITHUB_PERSONAL_TOKEN=$GITHUB_TOKEN cargo run -- --config-path=sample_config.json -edit
       - name: Push updated TWIOS
         run: |
           git fetch origin $TWIOS_PR_REF
