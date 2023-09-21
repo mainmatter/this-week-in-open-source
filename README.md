@@ -121,3 +121,7 @@ then grab a binary of the specified target located in the target directory e.g `
 
 [sample_output.md](2021-12-01.md)
 [sample_config.json](sample_config.json)
+
+### Releasing
+- cargo install cross --git https://github.com/cross-rs/cross#v0.2.5
+- cross build --target=x86_64-unknown-linux-gnu --release

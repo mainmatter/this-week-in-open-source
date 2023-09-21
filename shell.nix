@@ -9,10 +9,11 @@ in
    # libiconv, openssl, pkgconfig are needed for openssl dependent packages
    libiconv                                                                                                                                                        
    openssl
-   pkgconfig                         
+   pkg-config                         
    # Rust tooling                    
    cargo                             
    rustup                            
    rust-analyzer
+   rustc
   ]; 
  } 
