@@ -238,12 +238,11 @@ fn write_twios_file_contents(content: &mut Vec<String>, labels: &Vec<LabelledIte
     }
 }
 
-fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParams, labels: &Vec<LabelledItem>, unknown_items: &Vec<Item>) {
+fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParams, unknown_items: &Vec<Item>) {
     content.push(String::from(""));
 
     content.push(format!("- TWIOS_PATH {}", app_params.output_path));
     content.push(format!("- TWIOS_DATE {}", app_params.date));
-    content.push(format!("- TWIOS_CATEGORIES {:?}", labels.into_iter().map(|item| item.name.clone()).collect::<Vec<_>>().join(",")));
     content.push("- TWIOS_UNLABELLED".to_string());
 
     let mut unknown_labels = HashSet::new();
@@ -312,7 +311,7 @@ async fn main() -> octocrab::Result<()> {
         },
         cli::CliContext::COMMENT => {
             let mut comment_content: Vec<String> = vec![];
-            write_twios_comment_contents(&mut comment_content, &app_params, &labels, &unknown_items);
+            write_twios_comment_contents(&mut comment_content, &app_params, &unknown_items);
             let twios_comment = cli::TwiosComment {
                 body: app_params.comment_body.clone()
             };
