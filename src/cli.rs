@@ -349,7 +349,7 @@ impl TwiosComment {
                 //         value.split(",").map(|s| s.trim().to_string()).collect();
                 // }
                 "TWIOS_UNLABELLED" => {
-                    let re_label = Regex::new(r"\[(?<repo>.*)\]\s+(?<label>\w+)").unwrap();
+                    let re_label = Regex::new(r"\[(?<repo>.*)\]\s+(?<label>(?:\w\s?)+)\s+(?<user>@\w+)").unwrap();
                     for line in value.split("\n") {
                         for capture in re_label.captures_iter(line) {
                             let label = &capture["label"];
@@ -581,6 +581,52 @@ Available categories
                 users: vec![],
                 labels: vec![LabelConfig {
                     name: "Ember".to_string(),
+                    repos: vec!["mainmatter/ember-simple-auth".to_string()]
+                }],
+                last_date: ">2021-11-28".to_string(),
+            },
+            merge_with_file_config(&mut expected.read(), file_config),
+        );
+    }
+
+    #[test]
+    fn it_catches_labels_with_spaces() {
+        let expected = TwiosComment {
+            body: r#"
+Post's file path
+- TWIOS_PATH /twios/ 
+Post's date
+- TWIOS_DATE >2021-11-28 
+Available categories
+- TWIOS_CATEGORIES Ember,Javascript,Typescript
+- TWIOS_UNLABELLED 
+ - [EmbarkStudios/spdx] UNKNOWN @SomeOne
+ - [mainmatter/ember-simple-auth] Ember With Spaces @SomeTwo  
+ - [simplabs/ember-error-route] EXCLUDED @SomeThree
+- Doesn't catch this
+            "#
+            .to_string(),
+        };
+
+        let file_config = FileConfig {
+            exclude_closed_not_merged: false,
+            header: vec![],
+            output_path: "".to_string(),
+            exclude: vec![],
+            users: vec![],
+            labels: vec![],
+            last_date: "".to_string(),
+        };
+
+        assert_eq!(
+            FileConfig {
+                exclude_closed_not_merged: false,
+                header: vec![],
+                output_path: "".to_string(),
+                exclude: vec!["simplabs/ember-error-route".to_string()],
+                users: vec![],
+                labels: vec![LabelConfig {
+                    name: "Ember With Spaces".to_string(),
                     repos: vec!["mainmatter/ember-simple-auth".to_string()]
                 }],
                 last_date: ">2021-11-28".to_string(),
