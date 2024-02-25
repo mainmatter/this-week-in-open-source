@@ -1,13 +1,14 @@
-use octocrab::{models, Octocrab};
-use serde;
-use serde::Deserialize;
-use std::{collections::HashSet, io};
+use octocrab::Octocrab;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::{collections::HashSet, io};
 
 mod cli;
 use cli::{args, AppParams};
+
+mod data_loader;
+use data_loader::{Item, ItemMergeStatus};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -15,53 +16,12 @@ const BREAK_LINE: &str = r#"
 
 "#;
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-enum ItemMergeStatus {
-    Merged,
-    NotMerged,
-    Unknown,
-}
-
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug, Clone)]
-struct Item {
-    issue_number: String,
-    issue_title: String,
-    issue_url: String,
-    organization_name: String,
-    repository_name: String,
-    full_repository_name: String,
-    repository_url: String,
-    user_login: String,
-    user_url: String,
-    state: String, // "open", "closed"
-    merge_status: ItemMergeStatus,
-}
-
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 struct LabelledItem {
     name: String,
     repos: Vec<String>,
     items: Vec<Item>,
-}
-
-async fn get_prs(
-    octocrab: &Octocrab,
-    user: &String,
-    date_sign: &String,
-    date: &String,
-) -> octocrab::Result<octocrab::Page<models::issues::Issue>, octocrab::Error> {
-    octocrab
-        .search()
-        .issues_and_pull_requests(&format!(
-            "is:pr author:{} created:{}{}",
-            user.as_str(),
-            date_sign.as_str(),
-            date.as_str(),
-        ))
-        .send()
-        .await
 }
 
 fn format_item(user_login: String, item: &Item) -> String {
@@ -73,73 +33,6 @@ fn format_item(user_login: String, item: &Item) -> String {
 
 fn format_label(repo: &LabelledItem) -> String {
     format!("## {}", repo.name)
-}
-
-async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item> {
-    let mut items: Vec<Item> = vec![];
-
-    for user in app_params.users.clone() {
-        let mut page = get_prs(&octocrab, &user, &app_params.date_sign, &app_params.date)
-            .await
-            .unwrap();
-
-        loop {
-            for issue in &page {
-                let url = issue.html_url.to_string();
-                let mut repository_url_parts = url.split("/").collect::<Vec<&str>>();
-                let path_parts = issue
-                    .html_url
-                    .path()
-                    .split("/")
-                    .filter(|x| x.len() > 0)
-                    .collect::<Vec<&str>>();
-
-                repository_url_parts.pop(); // id
-                repository_url_parts.pop(); // /pulls
-
-                items.push(Item {
-                    user_login: issue.user.login.clone(),
-                    user_url: issue.user.html_url.to_string(),
-                    issue_number: issue.number.to_string(),
-                    issue_title: issue.title.clone(),
-                    issue_url: url.to_string(),
-                    organization_name: path_parts[0].to_string(),
-                    repository_name: path_parts[1].to_string(),
-                    full_repository_name: format!("{}/{}", path_parts[0], path_parts[1]),
-                    repository_url: repository_url_parts.join("/"),
-                    state: issue.state.clone(),
-                    merge_status: ItemMergeStatus::Unknown,
-                });
-            }
-            page = match octocrab.get_page(&page.next).await.unwrap() {
-                Some(next_page) => next_page,
-                None => {
-                    break;
-                }
-            }
-        }
-    }
-
-    items
-}
-
-async fn set_item_merge_status(octocrab: &Octocrab, items: &mut Vec<Item>) -> () {
-    for item in items {
-        match octocrab
-            .pulls(item.organization_name.clone(), item.repository_name.clone())
-            .is_merged(item.issue_number.parse::<u64>().unwrap())
-            .await
-        {
-            Ok(is_merged) => {
-                if is_merged {
-                    item.merge_status = ItemMergeStatus::Merged
-                } else {
-                    item.merge_status = ItemMergeStatus::NotMerged
-                }
-            }
-            Err(_) => item.merge_status = ItemMergeStatus::Unknown,
-        }
-    }
 }
 
 fn filter_items_by_merge_status(items: Vec<Item>) -> Vec<Item> {
@@ -220,7 +113,11 @@ fn format_items(items: &Vec<Item>) -> Vec<String> {
         .collect::<Vec<String>>()
 }
 
-fn write_twios_file_contents(content: &mut Vec<String>, labels: &Vec<LabelledItem>, unknown_items: &Vec<Item>) {
+fn write_twios_file_contents(
+    content: &mut Vec<String>,
+    labels: &Vec<LabelledItem>,
+    unknown_items: &Vec<Item>,
+) {
     for (i, label) in labels.iter().filter(|i| i.items.len() > 0).enumerate() {
         if i > 0 {
             content.push(String::from(""));
@@ -238,7 +135,11 @@ fn write_twios_file_contents(content: &mut Vec<String>, labels: &Vec<LabelledIte
     }
 }
 
-fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParams, unknown_items: &Vec<Item>) {
+fn write_twios_comment_contents(
+    content: &mut Vec<String>,
+    app_params: &AppParams,
+    unknown_items: &Vec<Item>,
+) {
     content.push(String::from(""));
 
     content.push(format!("- TWIOS_PATH {}", app_params.output_path));
@@ -248,10 +149,9 @@ fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParam
     let mut unknown_labels = HashSet::new();
     for item in unknown_items.iter() {
         let label = format!(
-        "  - [{}] UNKNOWN @{}",
-        item.full_repository_name,
-        item.user_login
-    );
+            "  - [{}] UNKNOWN @{}",
+            item.full_repository_name, item.user_login
+        );
         if !unknown_labels.contains(&label) {
             unknown_labels.insert(label.clone());
             content.push(label);
@@ -268,15 +168,15 @@ async fn main() -> octocrab::Result<()> {
     println!("");
 
     let octocrab = initialize_octocrab().await?;
-
+    let data_loader = data_loader::DataLoader::new(octocrab);
     let (app_params, file_config) = args();
 
-    let mut items = get_user_items(&octocrab, &app_params).await;
+    let mut items = data_loader.get_user_items(&app_params).await;
     items = items
         .into_iter()
         .filter(|item| !app_params.exclude.contains(&item.full_repository_name))
         .collect::<Vec<_>>();
-    set_item_merge_status(&octocrab, &mut items).await;
+    data_loader.set_item_merge_status(&mut items).await;
     if app_params.exclude_closed_not_merged {
         items = filter_items_by_merge_status(items);
     }
@@ -301,28 +201,34 @@ async fn main() -> octocrab::Result<()> {
             let mut file_content: Vec<String> = vec![];
             write_twios_file_contents(&mut file_content, &labels, &unknown_items);
 
-            file.write_all(app_params.header.join("\n").as_bytes()).unwrap();
+            file.write_all(app_params.header.join("\n").as_bytes())
+                .unwrap();
             file.write_all(file_content.join("\n").as_bytes()).unwrap();
             file.write(BREAK_LINE.as_bytes()).unwrap();
-            file.write_all(markdown_definitions.join("\n").as_bytes()).unwrap();
+            file.write_all(markdown_definitions.join("\n").as_bytes())
+                .unwrap();
             println!("");
             println!("Done! :)");
-
-        },
+        }
         cli::CliContext::COMMENT => {
             let mut comment_content: Vec<String> = vec![];
             write_twios_comment_contents(&mut comment_content, &app_params, &unknown_items);
             let twios_comment = cli::TwiosComment {
-                body: app_params.comment_body.clone()
+                body: app_params.comment_body.clone(),
             };
 
             let mut output = twios_comment.read();
 
-            cli::write_config_to_file(app_params.config_path.clone(), &cli::merge_with_file_config(&mut output, file_config.unwrap())).unwrap();
-            io::stdout().write_all(comment_content.join("\n").as_bytes()).unwrap();
+            cli::write_config_to_file(
+                app_params.config_path.clone(),
+                &cli::merge_with_file_config(&mut output, file_config.unwrap()),
+            )
+            .unwrap();
+            io::stdout()
+                .write_all(comment_content.join("\n").as_bytes())
+                .unwrap();
         }
     }
-
 
     Ok(())
 }
