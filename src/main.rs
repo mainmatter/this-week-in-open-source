@@ -51,12 +51,14 @@ async fn get_prs(
     user: &String,
     date_sign: &String,
     date: &String,
+    pr_state_query: &str,
 ) -> octocrab::Result<octocrab::Page<models::issues::Issue>, octocrab::Error> {
     octocrab
         .search()
         .issues_and_pull_requests(&format!(
-            "is:pr author:{} created:{}{}",
+            "is:pr author:{} {}:{}{}",
             user.as_str(),
+            pr_state_query,
             date_sign.as_str(),
             date.as_str(),
         ))
@@ -78,11 +80,17 @@ fn format_label(repo: &LabelledItem) -> String {
 async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item> {
     let mut items: Vec<Item> = vec![];
 
+    let query_type = match app_params.query_type {
+        cli::PullRequestQueryType::Merged => "merged",
+        cli::PullRequestQueryType::Created => "created",
+    };
+
     for user in app_params.users.clone() {
-        let mut page = get_prs(&octocrab, &user, &app_params.date_sign, &app_params.date)
+        let mut page = get_prs(&octocrab, &user, &app_params.date_sign, &app_params.date, query_type)
             .await
             .unwrap();
 
+        println!("{:?}", page);
         loop {
             for issue in &page {
                 let url = issue.html_url.to_string();

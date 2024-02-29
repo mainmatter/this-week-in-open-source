@@ -54,12 +54,15 @@ pub struct FileConfig {
     output_path: String,
     #[serde(default)]
     last_date: String,
+    #[serde(default)]
+    query_type: PullRequestQueryType,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 pub struct AppParams {
     pub exclude_closed_not_merged: bool,
+    pub query_type: PullRequestQueryType,
     pub labels: Vec<LabelConfig>,
     pub header: Vec<String>,
     pub users: Vec<String>,
@@ -70,6 +73,18 @@ pub struct AppParams {
     pub output_path: String,
     pub context: CliContext,
     pub comment_body: String,
+}
+
+#[derive(PartialEq, Debug, Clone, Deserialize, Serialize)]
+pub enum PullRequestQueryType {
+    Created,
+    Merged,
+}
+
+impl Default for PullRequestQueryType {
+    fn default() -> Self {
+        PullRequestQueryType::Created
+    }
 }
 
 impl AppParams {
@@ -128,6 +143,7 @@ pub fn args() -> (AppParams, Option<FileConfig>) {
                     output_path: file_config.output_path.clone(),
                     context: cli_context,
                     comment_body: args.comment_body,
+                    query_type: file_config.query_type.clone(),
                 },
                 Some(file_config),
             )
@@ -160,6 +176,7 @@ pub fn args() -> (AppParams, Option<FileConfig>) {
                     output_path: "".to_string(),
                     context: cli_context,
                     comment_body: "".to_string(),
+                    query_type: PullRequestQueryType::default(),
                 },
                 None,
             )
