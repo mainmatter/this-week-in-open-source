@@ -90,7 +90,6 @@ async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item
             .await
             .unwrap();
 
-        println!("{:?}", page);
         loop {
             for issue in &page {
                 let url = issue.html_url.to_string();
