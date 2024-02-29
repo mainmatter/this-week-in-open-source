@@ -27,6 +27,6 @@
     "Turbo87/sentry-conduit"
   ],
   "exclude_closed_not_merged": true,
-  "query_type": "Merged",
+  "query_type": "Created",
   "output_path": "twios/"
 }
