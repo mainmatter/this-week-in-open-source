@@ -487,6 +487,7 @@ mod tests {
             output_path: "".to_string(),
             date_sign: "".to_string(),
             exclude: vec![],
+            query_type: PullRequestQueryType::Created,
         };
         assert_eq!("2022-06-30.md", app_params.file_name());
     }
@@ -505,6 +506,7 @@ mod tests {
             output_path: "".to_string(),
             date_sign: "".to_string(),
             exclude: vec![],
+            query_type: PullRequestQueryType::Created,
         };
         assert_eq!("2022-06-30.md", app_params.file_name());
     }
@@ -523,6 +525,7 @@ mod tests {
             output_path: "src/twios/".to_string(),
             date_sign: "".to_string(),
             exclude: vec![],
+            query_type: PullRequestQueryType::Created,
         };
         assert_eq!("src/twios/2022-06-30.md", app_params.file_name());
     }
@@ -587,6 +590,7 @@ Available categories
             users: vec![],
             labels: vec![],
             last_date: "".to_string(),
+            query_type: PullRequestQueryType::Created,
         };
 
         assert_eq!(
@@ -601,6 +605,7 @@ Available categories
                     repos: vec!["mainmatter/ember-simple-auth".to_string()]
                 }],
                 last_date: ">2021-11-28".to_string(),
+                query_type: PullRequestQueryType::Created,
             },
             merge_with_file_config(&mut expected.read(), file_config),
         );
@@ -633,6 +638,7 @@ Available categories
             users: vec![],
             labels: vec![],
             last_date: "".to_string(),
+            query_type: PullRequestQueryType::Created,
         };
 
         assert_eq!(
@@ -647,6 +653,7 @@ Available categories
                     repos: vec!["mainmatter/ember-simple-auth".to_string()]
                 }],
                 last_date: ">2021-11-28".to_string(),
+                query_type: PullRequestQueryType::Created,
             },
             merge_with_file_config(&mut expected.read(), file_config),
         );
