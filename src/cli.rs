@@ -334,13 +334,21 @@ pub fn merge_with_file_config(
 
         match in_file {
             Some(config) => {
-                config.repos.append(&mut label.repos);
+                for repo in &label.repos {
+                    if !config.repos.contains(repo) {
+                        config.repos.push(repo.to_string());
+                    }
+                }
             }
             None => new_config.labels.push(label.clone()),
         }
     }
 
-    new_config.exclude.append(&mut comment_output.excluded);
+    for repo in &comment_output.excluded {
+        if !new_config.exclude.contains(repo) {
+            new_config.exclude.push(repo.to_string());
+        }
+    }
     new_config.last_date = comment_output.date.clone();
 
     new_config
@@ -652,6 +660,57 @@ Available categories
                 users: vec![],
                 labels: vec![LabelConfig {
                     name: "Ember With Spaces".to_string(),
+                    repos: vec!["mainmatter/ember-simple-auth".to_string()]
+                }],
+                last_date: ">2021-11-28".to_string(),
+                query_type: PullRequestQueryType::Created,
+            },
+            merge_with_file_config(&mut expected.read(), file_config),
+        );
+    }
+
+    #[test]
+    fn it_doesnt_push_already_exisiting_records() {
+        let expected = TwiosComment {
+            body: r#"
+Post's file path
+- TWIOS_PATH /twios/ 
+Post's date
+- TWIOS_DATE >2021-11-28 
+Available categories
+- TWIOS_CATEGORIES Ember,Javascript,Typescript
+- TWIOS_UNLABELLED 
+ - [EmbarkStudios/spdx] UNKNOWN @SomeOne
+ - [mainmatter/ember-simple-auth] Ember @SomeTwo  
+ - [simplabs/ember-error-route] EXCLUDED @SomeThree
+- Doesn't catch this
+            "#
+            .to_string(),
+        };
+
+        let file_config = FileConfig {
+            exclude_closed_not_merged: false,
+            header: vec![],
+            output_path: "".to_string(),
+            exclude: vec!["simplabs/ember-error-route".to_string()],
+            users: vec![],
+            labels: vec![LabelConfig {
+                name: "Ember".to_string(),
+                repos: vec!["mainmatter/ember-simple-auth".to_string()],
+            }],
+            last_date: "".to_string(),
+            query_type: PullRequestQueryType::Created,
+        };
+
+        assert_eq!(
+            FileConfig {
+                exclude_closed_not_merged: false,
+                header: vec![],
+                output_path: "".to_string(),
+                exclude: vec!["simplabs/ember-error-route".to_string()],
+                users: vec![],
+                labels: vec![LabelConfig {
+                    name: "Ember".to_string(),
                     repos: vec!["mainmatter/ember-simple-auth".to_string()]
                 }],
                 last_date: ">2021-11-28".to_string(),
