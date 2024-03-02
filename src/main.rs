@@ -7,7 +7,7 @@ use std::io::prelude::*;
 use std::{collections::HashSet, io};
 
 mod cli;
-use cli::{args, AppParams};
+use cli::{args, AppParams, FileConfig};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -39,7 +39,7 @@ struct Item {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct LabelledItem {
     name: String,
     repos: Vec<String>,
@@ -282,15 +282,10 @@ fn write_twios_comment_contents(
     content.push("Change repo category to `EXCLUDED` in order to permantently ignore it from TWIOS from now on.".to_string());
 }
 
-#[tokio::main]
-async fn main() -> octocrab::Result<()> {
-    println!("Using this-week-in-open-source v{}", VERSION);
-    println!("");
-
+async fn fetch_data(
+    app_params: &AppParams,
+) -> octocrab::Result<(Vec<LabelledItem>, Vec<Item>, Vec<String>)> {
     let octocrab = initialize_octocrab().await?;
-
-    let (app_params, file_config) = args();
-
     let mut items = get_user_items(&octocrab, &app_params).await;
     items = items
         .into_iter()
@@ -315,8 +310,19 @@ async fn main() -> octocrab::Result<()> {
         .collect::<Vec<LabelledItem>>();
     let (labels, unknown_items) = match_items_with_labels(&mut labelled_items, &items);
 
+    Ok((labels.clone().to_vec(), unknown_items, markdown_definitions))
+}
+
+#[tokio::main]
+async fn main() -> octocrab::Result<()> {
+    println!("Using this-week-in-open-source v{}", VERSION);
+    println!("");
+
+    let (app_params, file_config) = args();
+
     match app_params.context {
         cli::CliContext::TWIOS => {
+            let (labels, unknown_items, markdown_definitions) = fetch_data(&app_params).await?;
             let mut file = File::create(app_params.file_name()).unwrap();
             let mut file_content: Vec<String> = vec![];
             write_twios_file_contents(&mut file_content, &labels, &unknown_items);
@@ -331,6 +337,7 @@ async fn main() -> octocrab::Result<()> {
             println!("Done! :)");
         }
         cli::CliContext::COMMENT => {
+            let (_labels, unknown_items, _markdown_definitions) = fetch_data(&app_params).await?;
             let mut comment_content: Vec<String> = vec![];
             write_twios_comment_contents(&mut comment_content, &app_params, &unknown_items);
             let twios_comment = cli::TwiosComment {
