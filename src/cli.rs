@@ -366,7 +366,9 @@ impl TwiosComment {
                 //         value.split(",").map(|s| s.trim().to_string()).collect();
                 // }
                 "TWIOS_UNLABELLED" => {
-                    let re_label = Regex::new(r"\[(?<repo>.*)\]\s+(?<label>(?:\w\s?)+)\s+(?<user>@\w+)").unwrap();
+                    let re_label =
+                        Regex::new(r"\[(?<repo>.*)\]\s+(?<label>(?:\w\s?)+)\s+(?<user>@\w+)")
+                            .unwrap();
                     for line in value.split("\n") {
                         for capture in re_label.captures_iter(line) {
                             let label = &capture["label"];

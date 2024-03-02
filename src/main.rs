@@ -1,10 +1,10 @@
 use octocrab::{models, Octocrab};
 use serde;
 use serde::Deserialize;
-use std::{collections::HashSet, io};
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::{collections::HashSet, io};
 
 mod cli;
 use cli::{args, AppParams};
@@ -86,9 +86,15 @@ async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item
     };
 
     for user in app_params.users.clone() {
-        let mut page = get_prs(&octocrab, &user, &app_params.date_sign, &app_params.date, query_type)
-            .await
-            .unwrap();
+        let mut page = get_prs(
+            &octocrab,
+            &user,
+            &app_params.date_sign,
+            &app_params.date,
+            query_type,
+        )
+        .await
+        .unwrap();
 
         loop {
             for issue in &page {
@@ -227,7 +233,11 @@ fn format_items(items: &Vec<Item>) -> Vec<String> {
         .collect::<Vec<String>>()
 }
 
-fn write_twios_file_contents(content: &mut Vec<String>, labels: &Vec<LabelledItem>, unknown_items: &Vec<Item>) {
+fn write_twios_file_contents(
+    content: &mut Vec<String>,
+    labels: &Vec<LabelledItem>,
+    unknown_items: &Vec<Item>,
+) {
     for (i, label) in labels.iter().filter(|i| i.items.len() > 0).enumerate() {
         if i > 0 {
             content.push(String::from(""));
@@ -245,7 +255,11 @@ fn write_twios_file_contents(content: &mut Vec<String>, labels: &Vec<LabelledIte
     }
 }
 
-fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParams, unknown_items: &Vec<Item>) {
+fn write_twios_comment_contents(
+    content: &mut Vec<String>,
+    app_params: &AppParams,
+    unknown_items: &Vec<Item>,
+) {
     content.push(String::from(""));
 
     content.push(format!("- TWIOS_PATH {}", app_params.output_path));
@@ -255,10 +269,9 @@ fn write_twios_comment_contents(content: &mut Vec<String>, app_params: &AppParam
     let mut unknown_labels = HashSet::new();
     for item in unknown_items.iter() {
         let label = format!(
-        "  - [{}] UNKNOWN @{}",
-        item.full_repository_name,
-        item.user_login
-    );
+            "  - [{}] UNKNOWN @{}",
+            item.full_repository_name, item.user_login
+        );
         if !unknown_labels.contains(&label) {
             unknown_labels.insert(label.clone());
             content.push(label);
@@ -308,28 +321,34 @@ async fn main() -> octocrab::Result<()> {
             let mut file_content: Vec<String> = vec![];
             write_twios_file_contents(&mut file_content, &labels, &unknown_items);
 
-            file.write_all(app_params.header.join("\n").as_bytes()).unwrap();
+            file.write_all(app_params.header.join("\n").as_bytes())
+                .unwrap();
             file.write_all(file_content.join("\n").as_bytes()).unwrap();
             file.write(BREAK_LINE.as_bytes()).unwrap();
-            file.write_all(markdown_definitions.join("\n").as_bytes()).unwrap();
+            file.write_all(markdown_definitions.join("\n").as_bytes())
+                .unwrap();
             println!("");
             println!("Done! :)");
-
-        },
+        }
         cli::CliContext::COMMENT => {
             let mut comment_content: Vec<String> = vec![];
             write_twios_comment_contents(&mut comment_content, &app_params, &unknown_items);
             let twios_comment = cli::TwiosComment {
-                body: app_params.comment_body.clone()
+                body: app_params.comment_body.clone(),
             };
 
             let mut output = twios_comment.read();
 
-            cli::write_config_to_file(app_params.config_path.clone(), &cli::merge_with_file_config(&mut output, file_config.unwrap())).unwrap();
-            io::stdout().write_all(comment_content.join("\n").as_bytes()).unwrap();
+            cli::write_config_to_file(
+                app_params.config_path.clone(),
+                &cli::merge_with_file_config(&mut output, file_config.unwrap()),
+            )
+            .unwrap();
+            io::stdout()
+                .write_all(comment_content.join("\n").as_bytes())
+                .unwrap();
         }
     }
-
 
     Ok(())
 }
