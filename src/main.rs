@@ -7,7 +7,7 @@ use std::io::prelude::*;
 use std::{collections::HashSet, io};
 
 mod cli;
-use cli::{args, AppParams, FileConfig};
+use cli::{args, AppParams};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
