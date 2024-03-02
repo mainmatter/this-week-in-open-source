@@ -348,6 +348,16 @@ async fn main() -> octocrab::Result<()> {
                 .write_all(comment_content.join("\n").as_bytes())
                 .unwrap();
         }
+        cli::CliContext::UTILITY => {
+            if app_params.dedupe {
+                let mut config = file_config
+                    .expect("Configuration file doesn't exist")
+                    .clone();
+                cli::dedupe_file_config(&mut config);
+                cli::write_config_to_file(app_params.config_path.clone(), &config)
+                    .expect("Couldn't write to file");
+            }
+        }
     }
 
     Ok(())

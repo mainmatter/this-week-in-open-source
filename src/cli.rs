@@ -14,6 +14,7 @@ use std::path::Path;
 pub enum CliContext {
     TWIOS,
     COMMENT,
+    UTILITY,
 }
 
 #[derive(Debug)]
@@ -26,9 +27,10 @@ pub struct Args {
     pub date: String,
     pub date_sign: String,
     pub config_path: String,
-    pub context: String,
+    pub context: CliContext,
     pub comment_body: String,
     pub edit: bool,
+    pub dedupe: bool,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -73,6 +75,7 @@ pub struct AppParams {
     pub output_path: String,
     pub context: CliContext,
     pub comment_body: String,
+    pub dedupe: bool,
 }
 
 #[derive(PartialEq, Debug, Clone, Deserialize, Serialize)]
@@ -103,12 +106,6 @@ impl AppParams {
 
 pub fn args() -> (AppParams, Option<FileConfig>) {
     let args = process_args(read_args());
-
-    let cli_context = if args.context == "twios_comment" {
-        CliContext::COMMENT
-    } else {
-        CliContext::TWIOS
-    };
 
     let now = chrono::offset::Utc::now();
     let last_week = chrono::offset::Utc::now()
@@ -141,9 +138,10 @@ pub fn args() -> (AppParams, Option<FileConfig>) {
                     date_sign: args.date_sign,
                     config_path: args.config_path,
                     output_path: file_config.output_path.clone(),
-                    context: cli_context,
+                    context: args.context,
                     comment_body: args.comment_body,
                     query_type: file_config.query_type.clone(),
+                    dedupe: args.dedupe,
                 },
                 Some(file_config),
             )
@@ -174,9 +172,10 @@ pub fn args() -> (AppParams, Option<FileConfig>) {
                     date_sign: args.date_sign,
                     config_path: args.config_path,
                     output_path: "".to_string(),
-                    context: cli_context,
+                    context: args.context,
                     comment_body: "".to_string(),
                     query_type: PullRequestQueryType::default(),
+                    dedupe: args.dedupe,
                 },
                 None,
             )
@@ -208,15 +207,19 @@ fn process_args(pairs: Vec<Arg>) -> Args {
         date: String::from(""),
         date_sign: String::from(""),
         config_path: String::from(""),
-        context: String::from(""),
+        context: CliContext::TWIOS,
         comment_body: String::from(""),
         edit: false,
+        dedupe: false,
     };
 
     for pair in pairs {
         match (pair.0.as_str(), pair.1.as_str()) {
             ("comment", _value) => {
-                args.context = "twios_comment".to_string();
+                args.context = CliContext::COMMENT;
+            }
+            ("utility", _value) => {
+                args.context = CliContext::UTILITY;
             }
             ("--comment", value) => {
                 args.comment_body = value.to_string();
@@ -235,6 +238,7 @@ fn process_args(pairs: Vec<Arg>) -> Args {
             ("-before", _) => args.date_sign = String::from("<"),
             ("-after", _) => args.date_sign = String::from(">"),
             ("-edit", _) => args.edit = true,
+            ("-dedupe", _) => args.dedupe = true,
             ("--config-path", value) => args.config_path = value.to_string(),
             (name, value) => println!("Could not handle argument {} with value {}", name, value),
         }
@@ -352,6 +356,14 @@ pub fn merge_with_file_config(
     new_config.last_date = comment_output.date.clone();
 
     new_config
+}
+
+pub fn dedupe_file_config(file_config: &mut FileConfig) {
+    for label in file_config.labels.iter_mut() {
+        label.repos.dedup();
+    }
+
+    file_config.exclude.dedup();
 }
 
 impl TwiosComment {
@@ -498,6 +510,7 @@ mod tests {
             date_sign: "".to_string(),
             exclude: vec![],
             query_type: PullRequestQueryType::Created,
+            dedupe: false,
         };
         assert_eq!("2022-06-30.md", app_params.file_name());
     }
@@ -517,6 +530,7 @@ mod tests {
             date_sign: "".to_string(),
             exclude: vec![],
             query_type: PullRequestQueryType::Created,
+            dedupe: false,
         };
         assert_eq!("2022-06-30.md", app_params.file_name());
     }
@@ -536,6 +550,7 @@ mod tests {
             date_sign: "".to_string(),
             exclude: vec![],
             query_type: PullRequestQueryType::Created,
+            dedupe: false,
         };
         assert_eq!("src/twios/2022-06-30.md", app_params.file_name());
     }
@@ -717,6 +732,48 @@ Available categories
                 query_type: PullRequestQueryType::Created,
             },
             merge_with_file_config(&mut expected.read(), file_config),
+        );
+    }
+
+    #[test]
+    fn it_dedupes_config() {
+        let mut file_config = FileConfig {
+            exclude_closed_not_merged: false,
+            header: vec![],
+            output_path: "".to_string(),
+            exclude: vec![
+                "simplabs/ember-error-route".to_string(),
+                "simplabs/ember-error-route".to_string(),
+            ],
+            users: vec![],
+            labels: vec![LabelConfig {
+                name: "Ember".to_string(),
+                repos: vec![
+                    "mainmatter/ember-simple-auth".to_string(),
+                    "mainmatter/ember-simple-auth".to_string(),
+                ],
+            }],
+            last_date: "".to_string(),
+            query_type: PullRequestQueryType::Created,
+        };
+
+        dedupe_file_config(&mut file_config);
+
+        assert_eq!(
+            FileConfig {
+                exclude_closed_not_merged: false,
+                header: vec![],
+                output_path: "".to_string(),
+                exclude: vec!["simplabs/ember-error-route".to_string()],
+                users: vec![],
+                labels: vec![LabelConfig {
+                    name: "Ember".to_string(),
+                    repos: vec!["mainmatter/ember-simple-auth".to_string()]
+                }],
+                last_date: "".to_string(),
+                query_type: PullRequestQueryType::Created,
+            },
+            file_config,
         );
     }
 }
