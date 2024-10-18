@@ -4,10 +4,12 @@ use serde::Deserialize;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::thread::sleep;
+use std::time::Duration;
 use std::{collections::HashSet, io};
 
 mod cli;
-use cli::{args, AppParams};
+use cli::{args, AppParams, PullRequestQueryType};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -110,6 +112,12 @@ async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item
                 repository_url_parts.pop(); // id
                 repository_url_parts.pop(); // /pulls
 
+                let merge_status = if app_params.query_type == PullRequestQueryType::Merged {
+                    ItemMergeStatus::Merged
+                } else {
+                    ItemMergeStatus::Unknown
+                };
+
                 items.push(Item {
                     user_login: issue.user.login.clone(),
                     user_url: issue.user.html_url.to_string(),
@@ -121,7 +129,7 @@ async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item
                     full_repository_name: format!("{}/{}", path_parts[0], path_parts[1]),
                     repository_url: repository_url_parts.join("/"),
                     state: issue.state.clone(),
-                    merge_status: ItemMergeStatus::Unknown,
+                    merge_status,
                 });
             }
             page = match octocrab.get_page(&page.next).await.unwrap() {
@@ -131,6 +139,10 @@ async fn get_user_items(octocrab: &Octocrab, app_params: &AppParams) -> Vec<Item
                 }
             }
         }
+
+        // Github API doesn't like requests happening too often.
+        // We add a timeout here to help with hitting rate limit
+        sleep(Duration::from_secs(1));
     }
 
     items
@@ -292,7 +304,9 @@ async fn fetch_data(
         .filter(|item| !app_params.exclude.contains(&item.full_repository_name))
         .collect::<Vec<_>>();
     set_item_merge_status(&octocrab, &mut items).await;
-    if app_params.exclude_closed_not_merged {
+    if app_params.exclude_closed_not_merged
+        && app_params.query_type.ne(&PullRequestQueryType::Merged)
+    {
         items = filter_items_by_merge_status(items);
     }
     items.sort_by_key(|item| item.full_repository_name.clone());
