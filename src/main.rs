@@ -327,7 +327,7 @@ async fn fetch_data(
     Ok((labels.clone().to_vec(), unknown_items, markdown_definitions))
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> octocrab::Result<()> {
     println!("Using this-week-in-open-source v{}", VERSION);
     println!("");

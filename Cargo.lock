@@ -1129,7 +1129,7 @@ dependencies = [
 
 [[package]]
 name = "this-week-in-open-source"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "chrono",
  "futures",
